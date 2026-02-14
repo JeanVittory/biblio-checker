@@ -5,10 +5,15 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { FileDropzone } from "@/components/file-dropzone";
 import { UploadStatus } from "@/components/upload-status";
 import { BackgroundGrid } from "@/components/background-grid";
-import { simulateProgress } from "@/lib/utils";
-import { ERROR_MESSAGES } from "@/lib/constants";
+import { simulateProgress, sourceTypeFromFileName } from "@/lib/utils";
+import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
 import type { UploadState } from "@/types/upload";
-import type { SignedUploadInitResponse } from "@/types/signedUpload";
+import type { BibliographyCheckRequest } from "@/types/bibliographyCheck";
+import { bibliographyCheckRequestSchema } from "@/lib/validation/bibliographyCheck";
+import { signedUploadService } from "@/services/signedUpload";
+import { uploadFileService } from "@/services/uploadFile";
+import { bibliographyCheckService } from "@/services/bibliographyCheck";
+import { cleanupUploadService } from "@/services/cleanupUpload";
 
 const initialState: UploadState = {
   status: "idle",
@@ -49,16 +54,27 @@ export default function Home() {
       setUploadState((prev) => ({ ...prev, progress }));
     });
 
+    let cleanupTarget: { bucket: string; path: string } | null = null;
+    const attemptCleanup = async () => {
+      if (!cleanupTarget) return;
+      try {
+        await cleanupUploadService(cleanupTarget.bucket, cleanupTarget.path);
+      } catch {
+        // best-effort
+      }
+    };
+
     try {
-      const initResponse = await fetch("/api/signed-upload", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, contentType: file.type }),
-      });
+      const initData = await signedUploadService(file);
 
-      const initData = (await initResponse.json()) as SignedUploadInitResponse;
-
-      if (!initResponse.ok || !initData.success || !initData.signedUrl || !initData.filePath) {
+      const initPath = initData.path ?? initData.filePath;
+      if (
+        !initData.success ||
+        !initData.signedUrl ||
+        !initData.bucket ||
+        !initData.requestId ||
+        !initPath
+      ) {
         stopProgress();
         setUploadState({
           status: "error",
@@ -69,19 +85,13 @@ export default function Home() {
         return;
       }
 
-      const uploadBody = new FormData();
-      uploadBody.append("cacheControl", "3600");
-      uploadBody.append("", file);
+      cleanupTarget = { bucket: initData.bucket, path: initPath };
 
-      const uploadResponse = await fetch(initData.signedUrl, {
-        method: "PUT",
-        headers: { "x-upsert": "false" },
-        body: uploadBody,
-      });
+      const uploadResponse = await uploadFileService(file, initData);
 
-      stopProgress();
-
-      if (!uploadResponse.ok) {
+      if (!uploadResponse || !uploadResponse.ok) {
+        await attemptCleanup();
+        stopProgress();
         setUploadState({
           status: "error",
           progress: 0,
@@ -91,6 +101,84 @@ export default function Home() {
         return;
       }
 
+      const sourceType = sourceTypeFromFileName(file.name);
+      if (!sourceType) {
+        await attemptCleanup();
+        stopProgress();
+        setUploadState({
+          status: "error",
+          progress: 0,
+          error: ERROR_MESSAGES.INVALID_TYPE,
+          fileName: file.name,
+        });
+        return;
+      }
+
+      const mimeType =
+        file.type === MIME_TYPES.PDF || file.type === MIME_TYPES.DOCX ? file.type : null;
+
+      if (!mimeType) {
+        await attemptCleanup();
+        stopProgress();
+        setUploadState({
+          status: "error",
+          progress: 0,
+          error: ERROR_MESSAGES.INVALID_TYPE,
+          fileName: file.name,
+        });
+        return;
+      }
+
+      const payload: BibliographyCheckRequest = {
+        requestId: initData.requestId,
+        extractMode: EXTRACT_MODES.BACKEND_EXTRACT_REFERENCES,
+        document: {
+          sourceType,
+          fileName: file.name,
+          mimeType,
+        },
+        storage: {
+          provider: STORAGE_PROVIDERS.SUPABASE,
+          bucket: initData.bucket,
+          path: initPath,
+        },
+      };
+
+      const validatedPayload = bibliographyCheckRequestSchema.parse(payload);
+
+      const bibliographyCheckResponse = await bibliographyCheckService(validatedPayload);
+
+      const bibliographyCheck = await bibliographyCheckResponse.json();
+
+      if (!bibliographyCheck.ok || !bibliographyCheck || typeof bibliographyCheck !== "object") {
+        await attemptCleanup();
+        stopProgress();
+        setUploadState({
+          status: "error",
+          progress: 0,
+          error: ERROR_MESSAGES.UPLOAD_FAILED,
+          fileName: file.name,
+        });
+        return;
+      }
+
+      const checkObj = bibliographyCheck as Record<string, unknown>;
+      const checkMessage = typeof checkObj.message === "string" ? checkObj.message : null;
+      const checkSuccess = typeof checkObj.success === "boolean" ? checkObj.success : false;
+
+      if (!checkSuccess) {
+        await attemptCleanup();
+        stopProgress();
+        setUploadState({
+          status: "error",
+          progress: 0,
+          error: checkMessage || ERROR_MESSAGES.UPLOAD_FAILED,
+          fileName: file.name,
+        });
+        return;
+      }
+
+      stopProgress();
       setUploadState({
         status: "success",
         progress: 100,
@@ -98,6 +186,7 @@ export default function Home() {
         fileName: file.name,
       });
     } catch {
+      await attemptCleanup();
       stopProgress();
       setUploadState({
         status: "error",
@@ -123,8 +212,7 @@ export default function Home() {
           <span
             className="bg-clip-text text-transparent"
             style={{
-              backgroundImage:
-                "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
+              backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
             }}
           >
             Biblio Checker
@@ -139,9 +227,7 @@ export default function Home() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Upload Your Bibliography
           </h2>
-          <p className="mt-3 text-muted">
-            Upload a PDF or DOCX file.
-          </p>
+          <p className="mt-3 text-muted">Upload a PDF or DOCX file.</p>
         </div>
 
         <div className="w-full space-y-6">
@@ -158,8 +244,7 @@ export default function Home() {
                 onClick={handleUpload}
                 className="glow-effect flex-1 rounded-lg px-6 py-2.5 text-sm font-medium text-white transition-colors"
                 style={{
-                  background:
-                    "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
+                  background: "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
                 }}
               >
                 Upload

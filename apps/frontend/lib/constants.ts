@@ -44,7 +44,8 @@ export const HTTP_STATUS = {
 
 export const UPLOAD_MESSAGES = {
   BACKEND_REQUEST_FAILED: "Backend request failed.",
-  SUCCESS_UPLOADED_AND_FORWARDED: "File uploaded to Supabase and forwarded to backend successfully.",
+  SUCCESS_UPLOADED_AND_FORWARDED:
+    "File uploaded to Supabase and forwarded to backend successfully.",
   SUPABASE_UPLOAD_FAILED_PREFIX: "Supabase upload failed:",
 } as const;
 
@@ -62,3 +63,17 @@ export const ERROR_MESSAGES = {
   NO_FILE: "No file selected.",
   SERVER_ERROR: "An unexpected server error occurred.",
 } as const;
+
+export enum API_ENDPOINTS {
+  SIGNED_UPLOAD = "/api/signed-upload",
+  BIBLIOGRAPHY_CHECK = "/api/bibliography-check",
+  CLEANUP_UPLOAD = "/api/cleanup-upload",
+}
+
+export enum ENDPOINT_ACTION_TYPES {
+  POST = "POST",
+  GET = "GET",
+  PUT = "PUT",
+  DELETE = "DELETE",
+  PATCH = "PATCH",
+}
