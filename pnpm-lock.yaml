@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  apps/frontend:
     dependencies:
       '@supabase/supabase-js':
         specifier: ^2.0.0
