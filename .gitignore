@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+
+# Environment files
+.env*
+!.env.local.example
+!.env.example
+
+# Dependencies
+node_modules/
+
+# pnpm
+.pnpm-store/
+.pnpm-debug.log*
+
+# Python (future backend)
+__pycache__/
+*.pyc
+.venv/
