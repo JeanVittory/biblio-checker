@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { ALLOWED_EXTENSIONS, ERROR_MESSAGES, HTTP_STATUS, MIME_TYPES } from "@/lib/constants";
+import { ALLOWED_EXTENSIONS, ERROR_MESSAGES, HTTP_STATUS, MIME_TYPES, UPLOAD_PATHS } from "@/lib/constants";
 import { extensionFromFileName, sanitizeFileName } from "@/lib/utils";
 import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { signedUploadEnvSchema, signedUploadRequestSchema } from "@/lib/validation/signUploadURL";
@@ -32,12 +32,12 @@ export async function POST(request: Request) {
     const requestId = uuidv4();
     const bucket = env.SUPABASE_STORAGE_BUCKET;
     const safeFileName = sanitizeFileName(body.fileName);
-    const filePath = `${bucket}/${requestId}/${safeFileName}`;
+    const path = `${UPLOAD_PATHS.PREFIX}/${requestId}/${safeFileName}`;
 
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase.storage
       .from(bucket)
-      .createSignedUploadUrl(filePath, { upsert: false });
+      .createSignedUploadUrl(path, { upsert: false });
 
     if (error || !data?.signedUrl) {
       return NextResponse.json(
@@ -57,7 +57,8 @@ export async function POST(request: Request) {
       message: "Signed upload URL created.",
       bucket,
       requestId,
-      filePath,
+      path,
+      filePath: path,
       signedUrl: data.signedUrl,
       clientExpiresInSeconds,
       clientExpiresAt,
