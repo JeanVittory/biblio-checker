@@ -8,9 +8,9 @@ export interface SignedUploadInitResponse {
   message: string;
   bucket?: string;
   requestId?: string;
+  path?: string;
   filePath?: string;
   signedUrl?: string;
   clientExpiresInSeconds?: number;
   clientExpiresAt?: string;
 }
-

@@ -1,7 +1,6 @@
 import type { EXTRACT_MODES, MIME_TYPES, SOURCE_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
 
 export type ExtractMode = (typeof EXTRACT_MODES)[keyof typeof EXTRACT_MODES];
-
 export type SourceType = (typeof SOURCE_TYPES)[keyof typeof SOURCE_TYPES];
 
 export interface BibliographyCheckRequest {
