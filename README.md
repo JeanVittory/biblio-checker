@@ -13,7 +13,7 @@ packages/     - (future) Shared libraries
 
 ## Prerequisites
 
-- Node.js 20+
+- Node 20+
 - pnpm 9+
 
 ## Getting Started
