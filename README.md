@@ -2,6 +2,15 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Environment variables
+
+Copy `.env.local.example` to `.env.local` and fill in:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-side only)
+- `SUPABASE_STORAGE_BUCKET`
+- `BIBLIO_BACKEND_CHECK_URL`
+
 First, run the development server:
 
 ```bash
