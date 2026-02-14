@@ -13,6 +13,7 @@ import {
   UPLOAD_PATHS,
 } from "@/lib/constants";
 import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
 import { bibliographyCheckRequestSchema } from "@/lib/validation/bibliographyCheck";
 import { sanitizeFileName, sourceTypeFromFileName } from "@/lib/utils";
 import type { BibliographyCheckRequest } from "@/types/bibliographyCheck";
@@ -23,6 +24,8 @@ import { routeEnvSchema } from "@/lib/validation/env";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  let cleanupTarget: { bucket: string; path: string } | null = null;
+  let uploadedSuccessfully = false;
   try {
     const env = routeEnvSchema.parse(process.env);
     const formData = await request.formData();
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
     const bucket = env.SUPABASE_STORAGE_BUCKET;
     const safeFileName = sanitizeFileName(file.name);
     const path = `${UPLOAD_PATHS.PREFIX}/${requestId}/${safeFileName}`;
+    cleanupTarget = { bucket, path };
 
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     const sha256 = createHash("sha256").update(Buffer.from(fileBytes)).digest("hex");
@@ -95,6 +99,7 @@ export async function POST(request: Request) {
         { status: HTTP_STATUS.BAD_GATEWAY }
       );
     }
+    uploadedSuccessfully = true;
 
     const payload: BibliographyCheckRequest = {
       requestId,
@@ -131,6 +136,9 @@ export async function POST(request: Request) {
     }
 
     if (!backendResponse.ok) {
+      if (cleanupTarget && uploadedSuccessfully) {
+        await cleanupUploadedFile(cleanupTarget.bucket, cleanupTarget.path);
+      }
       return NextResponse.json(
         {
           success: false,
@@ -155,6 +163,9 @@ export async function POST(request: Request) {
       backend: backendJson,
     });
   } catch (error) {
+    if (cleanupTarget && uploadedSuccessfully) {
+      await cleanupUploadedFile(cleanupTarget.bucket, cleanupTarget.path);
+    }
     const message = error instanceof Error ? error.message : ERROR_MESSAGES.SERVER_ERROR;
     return NextResponse.json(
       { success: false, message, fileId: "", fileName: "" },
