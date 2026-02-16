@@ -28,7 +28,7 @@ Run from `apps/backend/`:
 
 - `app/main.py` — FastAPI app factory + middleware + router registration
 - `app/core/config.py` — settings loaded from `.env` (see `.env.example`)
-- `app/api/routes/health.py` — `GET /health`
+- `app/api/routes/references/verify_authenticity.py` — `POST /api/references/verify-authenticity`
 - `tests/` — pytest tests
 
 ## Conventions
@@ -36,4 +36,3 @@ Run from `apps/backend/`:
 - Always run code via `uv run ...` to ensure the venv interpreter is used (avoid relying on `python`/pyenv shims).
 - Keep settings in env vars; update `.env.example` when adding new required variables.
 </INSTRUCTIONS>
-

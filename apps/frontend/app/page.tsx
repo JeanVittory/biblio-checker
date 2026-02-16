@@ -12,8 +12,8 @@ import type { BibliographyCheckRequest } from "@/types/bibliographyCheck";
 import { bibliographyCheckRequestSchema } from "@/lib/validation/bibliographyCheck";
 import { signedUploadService } from "@/services/signedUpload";
 import { uploadFileService } from "@/services/uploadFile";
-import { bibliographyCheckService } from "@/services/bibliographyCheck";
 import { cleanupUploadService } from "@/services/cleanupUpload";
+import { verifyAuthenticityGatewayService } from "@/services/verifyAuthenticityGateway";
 
 const initialState: UploadState = {
   status: "idle",
@@ -146,11 +146,15 @@ export default function Home() {
 
       const validatedPayload = bibliographyCheckRequestSchema.parse(payload);
 
-      const bibliographyCheckResponse = await bibliographyCheckService(validatedPayload);
+      const bibliographyCheckResponse = await verifyAuthenticityGatewayService(validatedPayload);
 
       const bibliographyCheck = await bibliographyCheckResponse.json();
 
-      if (!bibliographyCheck.ok || !bibliographyCheck || typeof bibliographyCheck !== "object") {
+      if (
+        !bibliographyCheckResponse.ok ||
+        !bibliographyCheck ||
+        typeof bibliographyCheck !== "object"
+      ) {
         await attemptCleanup();
         stopProgress();
         setUploadState({

@@ -5,7 +5,8 @@ import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
 import { bibliographyCheckRequestSchema } from "@/lib/validation/bibliographyCheck";
 import { routeEnvSchema } from "@/lib/validation/env";
-import { ERROR_MESSAGES, HEADER_NAMES, HTTP_STATUS, MIME_TYPES } from "@/lib/constants";
+import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
+import { verifyAuthenticityService } from "@/services/verifyAuthenticity";
 
 export const runtime = "nodejs";
 
@@ -49,28 +50,18 @@ export async function POST(request: Request) {
     };
 
     const validatedPayload = bibliographyCheckRequestSchema.parse(payloadWithIntegrity);
+    const response = await verifyAuthenticityService(env.BIBLIO_BACKEND_CHECK_URL, validatedPayload);
 
-    const backendResponse = await fetch(env.BIBLIO_BACKEND_CHECK_URL, {
-      method: "POST",
-      headers: { [HEADER_NAMES.CONTENT_TYPE]: MIME_TYPES.JSON },
-      body: JSON.stringify(validatedPayload),
-    });
-
-    const backendText = await backendResponse.text();
-    let backendJson: unknown = null;
-    try {
-      backendJson = backendText ? JSON.parse(backendText) : null;
-    } catch {
-      backendJson = backendText;
-    }
+    const analysisResponse = await response.json();
 
     const backendBodyIndicatesError =
-      backendJson &&
-      typeof backendJson === "object" &&
-      (("ok" in backendJson && (backendJson as Record<string, unknown>).ok === false) ||
-        ("success" in backendJson && (backendJson as Record<string, unknown>).success === false));
+      analysisResponse &&
+      typeof analysisResponse === "object" &&
+      (("ok" in analysisResponse && (analysisResponse as Record<string, unknown>).ok === false) ||
+        ("success" in analysisResponse &&
+          (analysisResponse as Record<string, unknown>).success === false));
 
-    if (!backendResponse.ok || backendBodyIndicatesError) {
+    if (!response.ok || backendBodyIndicatesError) {
       await cleanupUploadedFile(validatedPayload.storage.bucket, validatedPayload.storage.path);
       return NextResponse.json(
         {
@@ -79,9 +70,9 @@ export async function POST(request: Request) {
           message: "Backend request failed.",
           requestId: validatedPayload.requestId,
           storage: validatedPayload.storage,
-          backend: backendJson,
+          backend: analysisResponse,
         },
-        { status: HTTP_STATUS.BAD_GATEWAY }
+        { status: response.status }
       );
     }
 
@@ -91,7 +82,7 @@ export async function POST(request: Request) {
       message: "Bibliography check forwarded successfully.",
       requestId: validatedPayload.requestId,
       storage: validatedPayload.storage,
-      backend: backendJson,
+      backend: analysisResponse,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

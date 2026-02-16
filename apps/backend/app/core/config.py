@@ -1,4 +1,5 @@
-from pydantic import field_validator
+import json
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,14 +8,27 @@ class Settings(BaseSettings):
 
     app_name: str = "Biblio Checker API"
     environment: str = "development"
-    allowed_origins: list[str] = ["http://localhost:3000"]
+    # Keep as a plain string so dotenv values like:
+    #   ALLOWED_ORIGINS="http://localhost:3000"
+    # don't get JSON-decoded by pydantic-settings (which would error for list[str]).
+    allowed_origins: str = "http://localhost:3000"
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, value: object) -> object:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        value = (self.allowed_origins or "").strip()
+        if not value:
+            return []
+
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                return [str(origin).strip() for origin in parsed if str(origin).strip()]
+
+        return [origin.strip() for origin in value.split(",") if origin.strip()]
 
 
 settings = Settings()
+
