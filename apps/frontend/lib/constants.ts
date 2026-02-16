@@ -66,6 +66,7 @@ export const ERROR_MESSAGES = {
 
 export enum API_ROUTES {
   SIGNED_UPLOAD = "/api/signed-upload",
+  VERIFY_AUTHENTICITY_GATEWAY = "/api/verify-authenticity-gateway",
   CLEANUP_UPLOAD = "/api/cleanup-upload",
 }
 

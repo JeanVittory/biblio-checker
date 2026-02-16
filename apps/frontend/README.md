@@ -28,7 +28,7 @@ Copy `.env.local.example` to `.env.local` and fill in:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side only)
 - `SUPABASE_STORAGE_BUCKET`
-- `BIBLIO_BACKEND_CHECK_URL`
+- `BIBLIO_BACKEND_CHECK_URL` (e.g. `http://127.0.0.1:8000/api/references/verify-authenticity`)
 
 ## Useful Commands
 
