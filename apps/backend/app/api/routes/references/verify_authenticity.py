@@ -4,7 +4,6 @@ from app.schemas.references import VerifyAuthenticityRequest, VerifyAuthenticity
 
 router = APIRouter()
 
-
 @router.post("/verify-authenticity", response_model=VerifyAuthenticityResponse)
 def verify_authenticity(payload: VerifyAuthenticityRequest) -> VerifyAuthenticityResponse:
     return VerifyAuthenticityResponse(

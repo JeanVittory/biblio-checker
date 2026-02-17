@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     #   ALLOWED_ORIGINS="http://localhost:3000"
     # don't get JSON-decoded by pydantic-settings (which would error for list[str]).
     allowed_origins: str = "http://localhost:3000"
+    allowed_buckets: str = "uploads"
+
+    @property
+    def allowed_buckets_set(self) -> set[str]:
+        return {b.strip() for b in self.allowed_buckets.split(",") if b.strip()}
 
     @property
     def allowed_origins_list(self) -> list[str]:
