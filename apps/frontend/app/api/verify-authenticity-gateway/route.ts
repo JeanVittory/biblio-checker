@@ -50,7 +50,11 @@ export async function POST(request: Request) {
     };
 
     const validatedPayload = bibliographyCheckRequestSchema.parse(payloadWithIntegrity);
-    const response = await verifyAuthenticityService(env.BIBLIO_BACKEND_CHECK_URL, validatedPayload);
+    console.log("Validated payload ready to be sent to backend:", validatedPayload);
+    const response = await verifyAuthenticityService(
+      env.BIBLIO_BACKEND_CHECK_URL,
+      validatedPayload
+    );
 
     const analysisResponse = await response.json();
 
@@ -85,6 +89,7 @@ export async function POST(request: Request) {
       backend: analysisResponse,
     });
   } catch (error) {
+    console.log(error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { ok: false, success: false, message: "Invalid request.", issues: error.issues },
