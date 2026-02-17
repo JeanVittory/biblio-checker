@@ -1,11 +1,54 @@
-# Backend (FastAPI)
+# Biblio Checker - Backend
 
-FastAPI service for the Biblio Checker monorepo.
+> Part of the [biblio-checker monorepo](../../README.md).
 
-## Requirements
+FastAPI service for verifying the authenticity of bibliographic references.
 
-- Python **3.12.x** 
-- `uv`
+## Tech Stack
+
+- **FastAPI** (web framework)
+- **Pydantic** (validation & settings)
+- **Uvicorn** (ASGI server)
+- **Ruff** (linting & formatting)
+- **Pytest** (testing)
+- **Python** 3.12.x
+- **uv** (package manager)
+
+## Project Structure
+
+```
+app/
+  main.py                                  # App factory, CORS middleware, router registration
+  core/
+    config.py                              # Settings loaded from .env
+  api/
+    router.py                              # Main API router (prefix: /api)
+    routes/references/
+      router.py                            # References sub-router (prefix: /references)
+      verify_authenticity.py               # POST /api/references/verify-authenticity
+  schemas/
+    references.py                          # Request/response models & validation
+    errors.py                              # Error response model
+tests/
+  test_verify_authenticity_validation.py   # Endpoint validation tests
+```
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/references/verify-authenticity` | Verify document authenticity |
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in:
+
+| Variable | Description | Example |
+|---|---|---|
+| `APP_NAME` | Application name | `Biblio Checker API` |
+| `ENVIRONMENT` | Environment type | `development` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins | `http://localhost:3000` |
+| `ALLOWED_BUCKETS` | Comma-separated allowed storage buckets | `uploads` |
 
 ## Setup
 
@@ -30,11 +73,10 @@ cd apps/backend
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-## Tests / lint
+## Tests / Lint
 
 ```bash
-pnpm test:backend
-pnpm lint:backend
-pnpm format:backend
+pnpm test:backend      # run tests
+pnpm lint:backend      # lint (ruff)
+pnpm format:backend    # format (ruff)
 ```
-
