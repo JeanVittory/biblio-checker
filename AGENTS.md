@@ -3,7 +3,7 @@
 ## Monorepo Structure
 
 - `apps/frontend/`: Next.js web application (see [apps/frontend/AGENTS.md](./apps/frontend/AGENTS.md))
-- `apps/backend/`: (planned) Backend service
+- `apps/backend/`: FastAPI service for bibliography verification (see [apps/backend/AGENTS.md](./apps/backend/AGENTS.md))
 - `packages/`: (future) Shared libraries
 
 ## Build Commands (from root)
@@ -12,11 +12,15 @@
 - `pnpm dev`: Start frontend dev server
 - `pnpm build`: Build all apps
 - `pnpm lint`: Lint all apps
+- `pnpm dev:backend`: Start backend dev server (FastAPI)
+- `pnpm test:backend`: Run backend tests (pytest)
+- `pnpm lint:backend`: Lint backend (ruff)
+- `pnpm format:backend`: Format backend (ruff)
 
 ## Workspace Commands
 
 - `pnpm --filter frontend <cmd>`: Run command in the frontend workspace
-- `pnpm --filter backend <cmd>`: Run command in the backend workspace (future)
+- `pnpm --filter backend <cmd>`: Run command in the backend workspace
 
 ## Commit & Pull Request Guidelines
 

@@ -3,12 +3,12 @@ import { EXTRACT_MODES, MIME_TYPES, SOURCE_TYPES, STORAGE_PROVIDERS } from "@/li
 
 export const extractModeSchema = z.literal(EXTRACT_MODES.BACKEND_EXTRACT_REFERENCES);
 
-export const sourceTypeSchema = z.union([z.literal(SOURCE_TYPES.PDF), z.literal(SOURCE_TYPES.DOCX)]);
-
-export const mimeTypeSchema = z.union([
-  z.literal(MIME_TYPES.PDF),
-  z.literal(MIME_TYPES.DOCX),
+export const sourceTypeSchema = z.union([
+  z.literal(SOURCE_TYPES.PDF),
+  z.literal(SOURCE_TYPES.DOCX),
 ]);
+
+export const mimeTypeSchema = z.union([z.literal(MIME_TYPES.PDF), z.literal(MIME_TYPES.DOCX)]);
 
 export const bibliographyCheckRequestSchema = z.object({
   requestId: z.string().uuid(),
@@ -23,11 +23,9 @@ export const bibliographyCheckRequestSchema = z.object({
     bucket: z.string().min(1),
     path: z.string().min(1),
   }),
-  integrity: z
-    .object({
-      sha256: z.string().regex(/^[a-f0-9]{64}$/),
-    })
-    .optional(),
+  integrity: z.object({
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  }),
 });
 
 export type BibliographyCheckRequestPayload = z.infer<typeof bibliographyCheckRequestSchema>;

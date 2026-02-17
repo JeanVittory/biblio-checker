@@ -70,6 +70,10 @@ export enum API_ROUTES {
   CLEANUP_UPLOAD = "/api/cleanup-upload",
 }
 
+export const BACKEND_ROUTES = {
+  VERIFY_AUTHENTICITY: "/api/references/verify-authenticity",
+} as const;
+
 export enum ENDPOINT_ACTION_TYPES {
   POST = "POST",
   GET = "GET",

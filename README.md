@@ -1,6 +1,13 @@
 # Biblio Checker
 
-Monorepo for the Biblio Checker application.
+Monorepo for the Biblio Checker application — a tool for verifying the authenticity of bibliographic references in academic documents.
+
+## Tech Stack
+
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS 4, Zod 4
+- **Backend**: FastAPI, Pydantic, Uvicorn, Ruff
+- **Storage**: Supabase
+- **Monorepo**: pnpm workspaces
 
 ## Structure
 
@@ -8,7 +15,6 @@ Monorepo for the Biblio Checker application.
 apps/
   frontend/   - Next.js web application
   backend/    - FastAPI service (Python)
-packages/     - (future) Shared libraries
 ```
 
 ## Prerequisites
@@ -25,7 +31,7 @@ pnpm install          # install all workspace dependencies
 pnpm dev              # start the frontend dev server
 ```
 
-## Backend (FastAPI)
+### Backend (FastAPI)
 
 ```bash
 cd apps/backend
