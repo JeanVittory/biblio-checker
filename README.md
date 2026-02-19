@@ -28,7 +28,7 @@ apps/
 
 ```bash
 pnpm install          # install all workspace dependencies
-pnpm dev              # start the frontend dev server
+pnpm dev:frontend     # start the frontend dev server
 ```
 
 ### Backend (FastAPI)
