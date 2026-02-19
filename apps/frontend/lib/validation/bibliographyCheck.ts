@@ -10,7 +10,7 @@ export const sourceTypeSchema = z.union([
 
 export const mimeTypeSchema = z.union([z.literal(MIME_TYPES.PDF), z.literal(MIME_TYPES.DOCX)]);
 
-export const bibliographyCheckRequestSchema = z.object({
+export const bibliographyCheckBaseSchema = z.object({
   requestId: z.string().uuid(),
   extractMode: extractModeSchema,
   document: z.object({
@@ -23,9 +23,13 @@ export const bibliographyCheckRequestSchema = z.object({
     bucket: z.string().min(1),
     path: z.string().min(1),
   }),
+});
+
+export const bibliographyCheckFullSchema = bibliographyCheckBaseSchema.extend({
   integrity: z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
   }),
 });
 
-export type BibliographyCheckRequestPayload = z.infer<typeof bibliographyCheckRequestSchema>;
+export type BibliographyCheckBasePayload = z.infer<typeof bibliographyCheckBaseSchema>;
+export type BibliographyCheckFullPayload = z.infer<typeof bibliographyCheckFullSchema>;

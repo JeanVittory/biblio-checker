@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
-import { bibliographyCheckRequestSchema } from "@/lib/validation/bibliographyCheck";
+import { bibliographyCheckBaseSchema, bibliographyCheckFullSchema } from "@/lib/validation/bibliographyCheck";
 import { routeEnvSchema } from "@/lib/validation/env";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import { verifyAuthenticityService } from "@/services/verifyAuthenticity";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   let cleanupTarget: { bucket: string; path: string } | null = null;
   try {
     const env = routeEnvSchema.parse(process.env);
-    const payload = bibliographyCheckRequestSchema.parse(await request.json());
+    const payload = bibliographyCheckBaseSchema.parse(await request.json());
     cleanupTarget = { bucket: payload.storage.bucket, path: payload.storage.path };
 
     if (payload.storage.bucket !== env.SUPABASE_STORAGE_BUCKET) {
@@ -49,8 +49,7 @@ export async function POST(request: Request) {
       integrity: { sha256 },
     };
 
-    const validatedPayload = bibliographyCheckRequestSchema.parse(payloadWithIntegrity);
-    console.log("Validated payload ready to be sent to backend:", validatedPayload);
+    const validatedPayload = bibliographyCheckFullSchema.parse(payloadWithIntegrity);
     const response = await verifyAuthenticityService(
       env.BIBLIO_BACKEND_CHECK_URL,
       validatedPayload
@@ -89,7 +88,6 @@ export async function POST(request: Request) {
       backend: analysisResponse,
     });
   } catch (error) {
-    console.log(error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { ok: false, success: false, message: "Invalid request.", issues: error.issues },

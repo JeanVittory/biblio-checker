@@ -9,7 +9,7 @@ import { simulateProgress, sourceTypeFromFileName } from "@/lib/utils";
 import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
 import type { UploadState } from "@/types/upload";
 import type { BibliographyCheckRequest } from "@/types/bibliographyCheck";
-import { bibliographyCheckRequestSchema } from "@/lib/validation/bibliographyCheck";
+import { bibliographyCheckBaseSchema } from "@/lib/validation/bibliographyCheck";
 import { signedUploadService } from "@/services/signedUpload";
 import { uploadFileService } from "@/services/uploadFile";
 import { cleanupUploadService } from "@/services/cleanupUpload";
@@ -66,7 +66,6 @@ export default function Home() {
 
     try {
       const initData = await signedUploadService(file);
-
       const initPath = initData.path ?? initData.filePath;
       if (
         !initData.success ||
@@ -88,7 +87,6 @@ export default function Home() {
       cleanupTarget = { bucket: initData.bucket, path: initPath };
 
       const uploadResponse = await uploadFileService(file, initData);
-
       if (!uploadResponse || !uploadResponse.ok) {
         await attemptCleanup();
         stopProgress();
@@ -144,7 +142,7 @@ export default function Home() {
         },
       };
 
-      const validatedPayload = bibliographyCheckRequestSchema.parse(payload);
+      const validatedPayload = bibliographyCheckBaseSchema.parse(payload);
 
       const bibliographyCheckResponse = await verifyAuthenticityGatewayService(validatedPayload);
 
