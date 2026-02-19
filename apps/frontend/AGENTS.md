@@ -26,11 +26,17 @@
 
 Use `pnpm` from the repo root or this directory:
 
-- `pnpm dev`: Run the app locally in development mode.
-- `pnpm build`: Production build.
-- `pnpm start`: Serve the production build.
-- `pnpm lint`: Run ESLint checks.
-- `pnpm exec tsc --noEmit`: Typecheck without emitting files.
+- From repo root:
+  - `pnpm dev:frontend`: Run the app locally in development mode.
+  - `pnpm build:frontend`: Production build.
+  - `pnpm lint:frontend`: Run ESLint checks.
+  - `pnpm --filter frontend exec tsc --noEmit`: Typecheck without emitting files.
+- From `apps/frontend/`:
+  - `pnpm dev`: Run the app locally in development mode.
+  - `pnpm build`: Production build.
+  - `pnpm start`: Serve the production build.
+  - `pnpm lint`: Run ESLint checks.
+  - `pnpm exec tsc --noEmit`: Typecheck without emitting files.
 
 ## Coding Style & Naming Conventions
 
@@ -42,7 +48,7 @@ Use `pnpm` from the repo root or this directory:
 ## Testing Guidelines
 
 - No automated test suite is configured yet.
-- Minimum verification for changes: `pnpm lint` + `pnpm exec tsc --noEmit`, and a quick manual run via `pnpm dev`.
+- Minimum verification for changes (from repo root): `pnpm lint:frontend` + `pnpm --filter frontend exec tsc --noEmit`, and a quick manual run via `pnpm dev:frontend`.
 
 ## Security & Configuration Tips
 

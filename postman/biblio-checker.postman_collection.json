@@ -1,0 +1,197 @@
+{
+  "info": {
+    "_postman_id": "2f7c0c9a-2d2e-4e21-8f55-2b1f5a41a9f0",
+    "name": "biblio-checker - Supabase upload + verify (local)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Emulates the frontend flow: (1) request signed upload URL from Next.js, (2) upload file to Supabase Storage via signedUrl, (3) call Next.js gateway to download+hash+forward to FastAPI, (4) optional cleanup.\n\nNo secrets are required in Postman; Supabase service role key stays server-side (Next.js + FastAPI env vars)."
+  },
+  "item": [
+    {
+      "name": "Supabase Flow (via Next.js API)",
+      "item": [
+        {
+          "name": "1) Create signed upload URL (Next.js)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "content-type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"{{test_file_name}}\",\n  \"contentType\": \"{{test_mime_type}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{frontend_base_url}}/api/signed-upload",
+            "description": "Calls `POST /api/signed-upload` to receive a Supabase Storage `signedUrl` and a `path` that includes `requestId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"success === true\", function () {",
+                  "  pm.expect(json).to.have.property(\"success\", true);",
+                  "  pm.expect(json).to.have.property(\"signedUrl\");",
+                  "  pm.expect(json).to.have.property(\"requestId\");",
+                  "  pm.expect(json).to.have.property(\"bucket\");",
+                  "  pm.expect(json).to.have.property(\"path\");",
+                  "});",
+                  "",
+                  "pm.environment.set(\"signedUrl\", json.signedUrl);",
+                  "pm.environment.set(\"requestId\", json.requestId);",
+                  "pm.environment.set(\"bucket\", json.bucket);",
+                  "pm.environment.set(\"path\", json.path);",
+                  "pm.environment.set(\"filePath\", json.filePath || json.path);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2) Upload file to Supabase (PUT signedUrl)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "x-upsert",
+                "value": "false"
+              },
+              {
+                "key": "content-type",
+                "value": "{{test_mime_type}}"
+              }
+            ],
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "{{upload_file_path}}"
+              }
+            },
+            "url": "{{signedUrl}}",
+            "description": "Uploads the document bytes to Supabase Storage via the signed upload URL.\n\nNotes:\n- In the Postman UI, you may need to switch Body to binary/file and select the PDF manually.\n- For automation, set `upload_file_path` (absolute or relative) and run with Newman."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Upload returns 2xx\", function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3) Verify authenticity (Next.js gateway → FastAPI)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "content-type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestId\": \"{{requestId}}\",\n  \"extractMode\": \"backend_extract_references\",\n  \"document\": {\n    \"sourceType\": \"{{test_source_type}}\",\n    \"fileName\": \"{{test_file_name}}\",\n    \"mimeType\": \"{{test_mime_type}}\"\n  },\n  \"storage\": {\n    \"provider\": \"supabase\",\n    \"bucket\": \"{{bucket}}\",\n    \"path\": \"{{path}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{frontend_base_url}}/api/verify-authenticity-gateway",
+            "description": "Calls `POST /api/verify-authenticity-gateway`.\n\nServer-side behavior:\n- Downloads the uploaded file from Supabase Storage\n- Computes SHA256\n- Forwards payload to FastAPI `POST /api/references/verify-authenticity`\n- On error, attempts cleanup in Supabase"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 2xx\", function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test(\"ok/success === true\", function () {",
+                  "  pm.expect(json).to.have.property(\"ok\", true);",
+                  "  pm.expect(json).to.have.property(\"success\", true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4) Cleanup uploaded file (Next.js)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "content-type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bucket\": \"{{bucket}}\",\n  \"path\": \"{{path}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{frontend_base_url}}/api/cleanup-upload",
+            "description": "Calls `POST /api/cleanup-upload` to delete the uploaded file from Supabase Storage."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 2xx\", function () {",
+                  "  pm.expect(pm.response.code).to.be.within(200, 299);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test(\"ok === true\", function () {",
+                  "  pm.expect(json).to.have.property(\"ok\", true);",
+                  "});",
+                  "",
+                  "pm.environment.unset(\"signedUrl\");",
+                  "pm.environment.unset(\"requestId\");",
+                  "pm.environment.unset(\"bucket\");",
+                  "pm.environment.unset(\"path\");",
+                  "pm.environment.unset(\"filePath\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "protocolProfileBehavior": {
+    "disableBodyPruning": true
+  }
+}

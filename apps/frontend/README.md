@@ -40,7 +40,7 @@ From the repo root:
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev:frontend
 ```
 
 Or from this directory:

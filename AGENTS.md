@@ -9,9 +9,9 @@
 ## Build Commands (from root)
 
 - `pnpm install`: Install all workspace dependencies
-- `pnpm dev`: Start frontend dev server
-- `pnpm build`: Build all apps
-- `pnpm lint`: Lint all apps
+- `pnpm dev:frontend`: Start frontend dev server
+- `pnpm build:frontend`: Build frontend for production
+- `pnpm lint:frontend`: Lint frontend (ESLint)
 - `pnpm dev:backend`: Start backend dev server (FastAPI)
 - `pnpm test:backend`: Run backend tests (pytest)
 - `pnpm lint:backend`: Lint backend (ruff)
