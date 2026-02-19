@@ -1,4 +1,5 @@
 import copy
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -11,13 +12,16 @@ VALID_PAYLOAD = {
     "extractMode": "backend_extract_references",
     "document": {
         "sourceType": "pdf",
-        "fileName": "Certificado laboral Jean.pdf",
+        "fileName": "dummy.pdf",
         "mimeType": "application/pdf",
     },
     "storage": {
         "provider": "supabase",
         "bucket": "uploads",
-        "path": "uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/Certificado laboral Jean.pdf",
+        "path": (
+            "uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/"
+            "dummy.pdf"
+        ),
     },
     "integrity": {
         "sha256": "a" * 64,
@@ -40,10 +44,40 @@ def _payload(**overrides):
 
 
 def test_happy_path():
-    resp = client.post(URL, json=VALID_PAYLOAD)
+    with patch(
+        "app.services.integrity.compute_object_sha256",
+        return_value="a" * 64,
+    ):
+        resp = client.post(URL, json=VALID_PAYLOAD)
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
+
+
+def test_sha_mismatch_returns_problem_json():
+    with patch(
+        "app.services.integrity.compute_object_sha256",
+        return_value="b" * 64,
+    ):
+        resp = client.post(URL, json=VALID_PAYLOAD)
+    assert resp.status_code == 409
+    assert "application/problem+json" in resp.headers.get("content-type", "")
+    body = resp.json()
+    assert body["code"] == "integrity_sha_mismatch"
+
+
+def test_storage_not_found_returns_problem_json():
+    from app.core.supabase_storage import SupabaseStorageError
+
+    with patch(
+        "app.services.integrity.compute_object_sha256",
+        side_effect=SupabaseStorageError(code="storage_not_found"),
+    ):
+        resp = client.post(URL, json=VALID_PAYLOAD)
+    assert resp.status_code == 404
+    assert "application/problem+json" in resp.headers.get("content-type", "")
+    body = resp.json()
+    assert body["code"] == "storage_not_found"
 
 
 def test_source_type_mime_type_mismatch():
@@ -68,7 +102,10 @@ def test_path_traversal_rejected():
 def test_absolute_path_rejected():
     payload = _payload(
         **{
-            "storage.path": "/uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/Certificado laboral Jean.pdf"
+            "storage.path": (
+                "/uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/"
+                "dummy.pdf"
+            )
         }
     )
     resp = client.post(URL, json=payload)
@@ -94,7 +131,10 @@ def test_null_byte_in_path_rejected():
 def test_request_id_not_in_path():
     payload = _payload(
         **{
-            "storage.path": "uploads/00000000-0000-0000-0000-000000000000/Certificado laboral Jean.pdf"
+            "storage.path": (
+                "uploads/00000000-0000-0000-0000-000000000000/"
+                "dummy.pdf"
+            )
         }
     )
     resp = client.post(URL, json=payload)
