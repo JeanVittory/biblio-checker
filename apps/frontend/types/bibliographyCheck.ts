@@ -16,7 +16,4 @@ export interface BibliographyCheckRequest {
     bucket: string;
     path: string;
   };
-  integrity?: {
-    sha256?: string;
-  };
 }

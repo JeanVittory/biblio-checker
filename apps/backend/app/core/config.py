@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # don't get JSON-decoded by pydantic-settings (which would error for list[str]).
     allowed_origins: str = "http://localhost:3000"
     allowed_buckets: str = "uploads"
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    max_file_size_bytes: int = 10 * 1024 * 1024  # 10 MB
 
     @property
     def allowed_buckets_set(self) -> set[str]:
@@ -36,4 +39,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

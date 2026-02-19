@@ -49,6 +49,8 @@ Copy `.env.example` to `.env` and fill in:
 | `ENVIRONMENT` | Environment type | `development` |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins | `http://localhost:3000` |
 | `ALLOWED_BUCKETS` | Comma-separated allowed storage buckets | `uploads` |
+| `SUPABASE_URL` | Supabase project URL | `https://YOUR_PROJECT_REF.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side) | `YOUR_SUPABASE_SERVICE_ROLE_KEY` |
 
 ## Setup
 
