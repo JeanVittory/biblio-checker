@@ -1,27 +1,42 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.problems import problem_response
-from app.core.supabase_storage import SupabaseStorageError
+from app.core.supabase_storage import SupabaseStorageError, download_object_bytes
 from app.schemas.references import VerifyAuthenticityRequest, VerifyAuthenticityResponse
 from app.services.integrity import (
     IntegrityShaMismatchError,
-    verify_supabase_object_sha256,
+    verify_sha256_bytes,
+)
+from app.services.text_extraction import (
+    TextExtractionError,
+    extract_text_from_bytes_async,
 )
 
 router = APIRouter()
 
 
 @router.post("/verify-authenticity", response_model=VerifyAuthenticityResponse)
-def verify_authenticity(
+async def verify_authenticity(
     payload: VerifyAuthenticityRequest,
+    request: Request,
 ) -> VerifyAuthenticityResponse | JSONResponse:
     try:
-        verify_supabase_object_sha256(
-            bucket=payload.storage.bucket,
-            path=payload.storage.path,
+        content = await download_object_bytes(
+            bucket=payload.storage.bucket, path=payload.storage.path
+        )
+        verify_sha256_bytes(
+            content=content,
             sha256=payload.integrity.sha256,
         )
+        extracted_text = await extract_text_from_bytes_async(
+            source_type=payload.document.sourceType,
+            content=content,
+            max_chars=int(settings.max_extracted_text_chars),
+        )
+        
+        request.state.extracted_text = extracted_text
     except SupabaseStorageError as exc:
         return problem_response(exc.code, detail_override=exc.detail)
     except IntegrityShaMismatchError:
@@ -29,6 +44,8 @@ def verify_authenticity(
             "integrity_sha_mismatch",
             extra={"requestId": str(payload.requestId)},
         )
+    except TextExtractionError as exc:
+        return problem_response(exc.code, detail_override=exc.detail)
 
     return VerifyAuthenticityResponse(
         message="Document authenticity verified successfully",
