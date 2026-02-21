@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_service_role_key: str = ""
     max_file_size_bytes: int = 10 * 1024 * 1024  # 10 MB
+    max_extracted_text_chars: int = 1_000_000
 
     @property
     def allowed_buckets_set(self) -> set[str]:

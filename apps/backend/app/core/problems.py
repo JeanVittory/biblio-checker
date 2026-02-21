@@ -44,6 +44,21 @@ PROBLEM_DEFS: dict[str, ProblemDef] = {
         title="Server misconfigured",
         default_detail="The server is missing required configuration.",
     ),
+    "text_extraction_unavailable": ProblemDef(
+        status=500,
+        title="Text extraction unavailable",
+        default_detail="The server is missing required text extraction dependencies.",
+    ),
+    "text_extraction_failed": ProblemDef(
+        status=422,
+        title="Text extraction failed",
+        default_detail="The server could not extract text from the document.",
+    ),
+    "extracted_text_too_large": ProblemDef(
+        status=413,
+        title="Extracted text too large",
+        default_detail="The extracted text exceeds the maximum allowed size.",
+    ),
 }
 
 
@@ -84,4 +99,3 @@ def problem_response(
         content=body,
         media_type="application/problem+json",
     )
-

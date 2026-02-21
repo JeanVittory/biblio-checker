@@ -34,6 +34,56 @@ def _headers() -> dict[str, str]:
         "apikey": key,
     }
 
+async def download_object_bytes(bucket: str, path: str) -> bytes:
+    if not (settings.supabase_url or "").strip() or not (
+        settings.supabase_service_role_key or ""
+    ).strip():
+        raise SupabaseStorageError(code="server_misconfigured")
+
+    url = _object_url(bucket, path)
+    headers = _headers()
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=_DEFAULT_TIMEOUT_SECONDS, follow_redirects=True
+        ) as client:
+            async with client.stream("GET", url, headers=headers) as resp:
+                if resp.status_code == 404:
+                    raise SupabaseStorageError(code="storage_not_found")
+                if resp.status_code in (401, 403):
+                    raise SupabaseStorageError(code="storage_unauthorized")
+                if resp.status_code >= 400:
+                    status_code = resp.status_code
+                    raise SupabaseStorageError(
+                        code="storage_download_failed",
+                        detail=f"Storage request failed with status {status_code}.",
+                    )
+
+                max_bytes = int(settings.max_file_size_bytes)
+                content_length = resp.headers.get("content-length")
+                if content_length is not None:
+                    try:
+                        if int(content_length) > max_bytes:
+                            raise SupabaseStorageError(code="file_too_large")
+                    except ValueError:
+                        pass
+
+                data = bytearray()
+                size = 0
+                async for chunk in resp.aiter_bytes(chunk_size=_CHUNK_SIZE):
+                    if not chunk:
+                        continue
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise SupabaseStorageError(code="file_too_large")
+                    data.extend(chunk)
+
+                return bytes(data)
+    except httpx.HTTPError as exc:
+        raise SupabaseStorageError(
+            code="storage_download_failed", detail=str(exc) or None
+        ) from exc
+
 
 def compute_object_sha256(bucket: str, path: str) -> str:
     if not (settings.supabase_url or "").strip() or not (
