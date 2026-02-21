@@ -31,7 +31,7 @@ VALID_PAYLOAD = {
     },
 }
 
-URL = "/api/references/verify-authenticity"
+URL = "/api/analysis/start"
 
 
 def _payload(**overrides):
@@ -57,10 +57,10 @@ async def _post(payload: dict):
 @pytest.mark.anyio
 async def test_happy_path():
     with patch(
-        "app.api.controllers.references.verify_authenticity.download_object_bytes",
+        "app.api.controllers.analysis.start.download_object_bytes",
         new=AsyncMock(return_value=DUMMY_CONTENT),
     ), patch(
-        "app.api.controllers.references.verify_authenticity.extract_text_from_bytes_async",
+        "app.api.controllers.analysis.start.extract_text_from_bytes_async",
         new=AsyncMock(return_value="dummy text"),
     ):
         resp = await _post(VALID_PAYLOAD)
@@ -72,7 +72,7 @@ async def test_happy_path():
 @pytest.mark.anyio
 async def test_sha_mismatch_returns_problem_json():
     with patch(
-        "app.api.controllers.references.verify_authenticity.download_object_bytes",
+        "app.api.controllers.analysis.start.download_object_bytes",
         new=AsyncMock(return_value=DUMMY_CONTENT),
     ):
         resp = await _post(_payload(**{"integrity.sha256": "a" * 64}))
@@ -87,7 +87,7 @@ async def test_storage_not_found_returns_problem_json():
     from app.core.supabase_storage import SupabaseStorageError
 
     with patch(
-        "app.api.controllers.references.verify_authenticity.download_object_bytes",
+        "app.api.controllers.analysis.start.download_object_bytes",
         new=AsyncMock(side_effect=SupabaseStorageError(code="storage_not_found")),
     ):
         resp = await _post(VALID_PAYLOAD)

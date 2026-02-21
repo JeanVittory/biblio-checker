@@ -30,15 +30,15 @@ Run from `apps/backend/`:
 - `app/main.py` — FastAPI app factory + CORS middleware + router registration
 - `app/core/config.py` — settings loaded from `.env` (see `.env.example`)
 - `app/api/router.py` — main API router (prefix: `/api`)
-- `app/api/routes/references/router.py` — references sub-router (prefix: `/references`)
-- `app/api/routes/references/verify_authenticity.py` — `POST /api/references/verify-authenticity`
-- `app/schemas/references.py` — request/response Pydantic models (VerifyAuthenticityRequest, VerifyAuthenticityResponse, DocumentPayload, StoragePayload, IntegrityPayload)
+- `app/api/routes/analysis/router.py` — analysis sub-router (prefix: `/analysis`)
+- `app/api/controllers/analysis/start.py` — `POST /api/analysis/start`
+- `app/schemas/analysis.py` — request/response Pydantic models (VerifyAuthenticityRequest, VerifyAuthenticityResponse, DocumentPayload, StoragePayload, IntegrityPayload)
 - `app/schemas/errors.py` — error response model
 - `tests/` — pytest tests
 
 ## Endpoint Details
 
-### POST /api/references/verify-authenticity
+### POST /api/analysis/start
 
 Request validates:
 - sourceType ↔ mimeType consistency

@@ -6,7 +6,7 @@
 
 - `app/`: Next.js App Router routes, layouts, and API endpoints (`app/api/**/route.ts`).
 - `components/`: Client UI components (generally `"use client"`).
-- `services/`: Client-side API service calls (signedUpload, uploadFile, verifyAuthenticity, cleanupUpload).
+- `services/`: Client-side API service calls (signedUpload, uploadFile, startAnalysis, cleanupUpload).
 - `lib/`: Shared utilities and server helpers.
   - `lib/constants.ts`: App-wide constants, enums, error messages.
   - `lib/supabaseAdmin.ts`: Supabase admin client (server-only).
@@ -19,7 +19,7 @@
 ## Key Flows
 
 - **Signed uploads**: `app/api/signed-upload/route.ts` creates a Supabase Storage signed upload URL and returns `{ signedUrl, filePath }` to the client.
-- **Verify authenticity**: `app/api/verify-authenticity-gateway/route.ts` downloads the file from Supabase, computes SHA256, and forwards the verification request to the backend FastAPI service.
+- **Start analysis**: `app/api/analysis-start-gateway/route.ts` downloads the file from Supabase, computes SHA256, and forwards the request to the backend FastAPI service.
 - **Cleanup uploads**: `app/api/cleanup-upload/route.ts` deletes uploaded files from Supabase Storage.
 
 ## Build, Test, and Development Commands

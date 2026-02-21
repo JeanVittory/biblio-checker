@@ -23,11 +23,12 @@ app/
     config.py                              # Settings loaded from .env
   api/
     router.py                              # Main API router (prefix: /api)
-    routes/references/
-      router.py                            # References sub-router (prefix: /references)
-      verify_authenticity.py               # POST /api/references/verify-authenticity
+    routes/analysis/
+      router.py                            # Analysis sub-router (prefix: /analysis)
+    controllers/analysis/
+      start.py                             # POST /api/analysis/start
   schemas/
-    references.py                          # Request/response models & validation
+    analysis.py                            # Request/response models & validation
     errors.py                              # Error response model
 tests/
   test_verify_authenticity_validation.py   # Endpoint validation tests
@@ -37,7 +38,7 @@ tests/
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/references/verify-authenticity` | Verify document authenticity |
+| `POST` | `/api/analysis/start` | Start analysis |
 
 ## Environment Variables
 
