@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.problems import problem_response
 from app.core.supabase_storage import SupabaseStorageError, download_object_bytes
-from app.schemas.references import VerifyAuthenticityRequest, VerifyAuthenticityResponse
+from app.schemas.analysis import VerifyAuthenticityRequest, VerifyAuthenticityResponse
 from app.services.integrity import (
     IntegrityShaMismatchError,
     verify_sha256_bytes,
@@ -17,8 +17,8 @@ from app.services.text_extraction import (
 router = APIRouter()
 
 
-@router.post("/verify-authenticity", response_model=VerifyAuthenticityResponse)
-async def verify_authenticity(
+@router.post("/start", response_model=VerifyAuthenticityResponse)
+async def start_analysis(
     payload: VerifyAuthenticityRequest,
     request: Request,
 ) -> VerifyAuthenticityResponse | JSONResponse:
@@ -35,7 +35,7 @@ async def verify_authenticity(
             content=content,
             max_chars=int(settings.max_extracted_text_chars),
         )
-        
+
         request.state.extracted_text = extracted_text
     except SupabaseStorageError as exc:
         return problem_response(exc.code, detail_override=exc.detail)
@@ -48,6 +48,6 @@ async def verify_authenticity(
         return problem_response(exc.code, detail_override=exc.detail)
 
     return VerifyAuthenticityResponse(
-        message="Document authenticity verified successfully",
+        message="Analysis started successfully",
         success=True,
     )

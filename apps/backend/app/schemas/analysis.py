@@ -16,6 +16,7 @@ SOURCE_TYPE_TO_EXTENSION: dict[str, str] = {
     "docx": ".docx",
 }
 
+
 class DocumentPayload(BaseModel):
     fileName: str = Field(..., min_length=1)
     mimeType: Literal[
@@ -108,6 +109,7 @@ class VerifyAuthenticityRequest(BaseModel):
             raise ValueError("; ".join(errors))
 
         return self
+
 
 class VerifyAuthenticityResponse(BaseModel):
     success: bool | None = None
