@@ -21,7 +21,7 @@ app/
   layout.tsx                            # Root layout
   api/
     signed-upload/route.ts              # Create signed upload URL
-    verify-authenticity-gateway/route.ts # Gateway to backend verification API
+    analysis-start-gateway/route.ts # Gateway to backend analysis API
     cleanup-upload/route.ts             # Delete uploaded files
 components/                             # React UI components
 services/                               # Client-side API service calls

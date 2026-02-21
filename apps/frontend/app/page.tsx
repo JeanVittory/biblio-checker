@@ -13,7 +13,7 @@ import { bibliographyCheckBaseSchema } from "@/lib/validation/bibliographyCheck"
 import { signedUploadService } from "@/services/signedUpload";
 import { uploadFileService } from "@/services/uploadFile";
 import { cleanupUploadService } from "@/services/cleanupUpload";
-import { verifyAuthenticityGatewayService } from "@/services/verifyAuthenticityGateway";
+import { startAnalysisGatewayService } from "@/services/startAnalysisGateway";
 
 const initialState: UploadState = {
   status: "idle",
@@ -144,7 +144,7 @@ export default function Home() {
 
       const validatedPayload = bibliographyCheckBaseSchema.parse(payload);
 
-      const bibliographyCheckResponse = await verifyAuthenticityGatewayService(validatedPayload);
+      const bibliographyCheckResponse = await startAnalysisGatewayService(validatedPayload);
 
       const bibliographyCheck = await bibliographyCheckResponse.json();
 

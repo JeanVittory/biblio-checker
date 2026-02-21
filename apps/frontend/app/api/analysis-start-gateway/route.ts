@@ -6,7 +6,7 @@ import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
 import { bibliographyCheckBaseSchema, bibliographyCheckFullSchema } from "@/lib/validation/bibliographyCheck";
 import { routeEnvSchema } from "@/lib/validation/env";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
-import { verifyAuthenticityService } from "@/services/verifyAuthenticity";
+import { startAnalysisService } from "@/services/startAnalysis";
 
 export const runtime = "nodejs";
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     };
 
     const validatedPayload = bibliographyCheckFullSchema.parse(payloadWithIntegrity);
-    const response = await verifyAuthenticityService(
+    const response = await startAnalysisService(
       env.BIBLIO_BACKEND_CHECK_URL,
       validatedPayload
     );
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       success: true,
-      message: "Bibliography check forwarded successfully.",
+      message: "Analysis started successfully.",
       requestId: validatedPayload.requestId,
       storage: validatedPayload.storage,
       backend: analysisResponse,

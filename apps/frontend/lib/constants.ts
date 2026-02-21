@@ -66,12 +66,12 @@ export const ERROR_MESSAGES = {
 
 export enum API_ROUTES {
   SIGNED_UPLOAD = "/api/signed-upload",
-  VERIFY_AUTHENTICITY_GATEWAY = "/api/verify-authenticity-gateway",
+  ANALYSIS_START_GATEWAY = "/api/analysis-start-gateway",
   CLEANUP_UPLOAD = "/api/cleanup-upload",
 }
 
 export const BACKEND_ROUTES = {
-  VERIFY_AUTHENTICITY: "/api/references/verify-authenticity",
+  ANALYSIS_START: "/api/analysis/start",
 } as const;
 
 export enum ENDPOINT_ACTION_TYPES {
