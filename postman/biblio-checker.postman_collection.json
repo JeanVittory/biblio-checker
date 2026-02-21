@@ -117,8 +117,8 @@
                 }
               }
             },
-            "url": "{{frontend_base_url}}/api/verify-authenticity-gateway",
-            "description": "Calls `POST /api/verify-authenticity-gateway`.\n\nServer-side behavior:\n- Downloads the uploaded file from Supabase Storage\n- Computes SHA256\n- Forwards payload to FastAPI `POST /api/references/verify-authenticity`\n- On error, attempts cleanup in Supabase"
+            "url": "{{frontend_base_url}}/api/analysis-start-gateway",
+            "description": "Calls `POST /api/analysis-start-gateway`.\n\nServer-side behavior:\n- Downloads the uploaded file from Supabase Storage\n- Computes SHA256\n- Forwards payload to FastAPI `POST /api/analysis/start`\n- On error, attempts cleanup in Supabase"
           },
           "event": [
             {
