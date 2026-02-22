@@ -9,6 +9,10 @@
     "dev:backend": "cd apps/backend && uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
     "test:backend": "cd apps/backend && uv run pytest",
     "lint:backend": "cd apps/backend && uv run ruff check .",
-    "format:backend": "cd apps/backend && uv run ruff format ."
+    "format:backend": "cd apps/backend && uv run ruff format .",
+    "dev:worker": "cd apps/worker && uv run python -m biblio_checker_worker",
+    "test:worker": "cd apps/worker && uv run pytest",
+    "lint:worker": "cd apps/worker && uv run ruff check .",
+    "format:worker": "cd apps/worker && uv run ruff format ."
   }
 }
