@@ -3,7 +3,10 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
-import { bibliographyCheckBaseSchema, bibliographyCheckFullSchema } from "@/lib/validation/bibliographyCheck";
+import {
+  bibliographyCheckBaseSchema,
+  bibliographyCheckFullSchema,
+} from "@/lib/validation/bibliographyCheck";
 import { routeEnvSchema } from "@/lib/validation/env";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import { startAnalysisService } from "@/services/startAnalysis";
@@ -50,10 +53,7 @@ export async function POST(request: Request) {
     };
 
     const validatedPayload = bibliographyCheckFullSchema.parse(payloadWithIntegrity);
-    const response = await startAnalysisService(
-      env.BIBLIO_BACKEND_CHECK_URL,
-      validatedPayload
-    );
+    const response = await startAnalysisService(env.BIBLIO_BACKEND_CHECK_URL, validatedPayload);
 
     const analysisResponse = await response.json();
 
@@ -63,7 +63,6 @@ export async function POST(request: Request) {
       (("ok" in analysisResponse && (analysisResponse as Record<string, unknown>).ok === false) ||
         ("success" in analysisResponse &&
           (analysisResponse as Record<string, unknown>).success === false));
-
     if (!response.ok || backendBodyIndicatesError) {
       await cleanupUploadedFile(validatedPayload.storage.bucket, validatedPayload.storage.path);
       return NextResponse.json(
