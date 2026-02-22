@@ -15,6 +15,7 @@ Monorepo for the Biblio Checker application — a tool for verifying the authent
 apps/
   frontend/   - Next.js web application
   backend/    - FastAPI service (Python)
+  worker/     - Python worker 
 ```
 
 ## Prerequisites
@@ -55,6 +56,10 @@ pnpm dev:backend                   # start backend dev server (FastAPI)
 pnpm test:backend                  # run backend tests
 pnpm lint:backend                  # lint backend (ruff)
 pnpm format:backend                # format backend (ruff)
+pnpm dev:worker                    # start worker (polling loop stub)
+pnpm test:worker                   # run worker tests
+pnpm lint:worker                   # lint worker (ruff)
+pnpm format:worker                 # format worker (ruff)
 pnpm --filter frontend <cmd>      # run any command in frontend workspace
 ```
 
@@ -62,3 +67,4 @@ pnpm --filter frontend <cmd>      # run any command in frontend workspace
 
 - **Frontend**: See [apps/frontend/README.md](./apps/frontend/README.md)
 - **Backend**: See [apps/backend/README.md](./apps/backend/README.md)
+- **Worker**: See [apps/worker/README.md](./apps/worker/README.md)
