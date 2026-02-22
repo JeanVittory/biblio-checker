@@ -59,6 +59,16 @@ PROBLEM_DEFS: dict[str, ProblemDef] = {
         title="Extracted text too large",
         default_detail="The extracted text exceeds the maximum allowed size.",
     ),
+    "db_unauthorized": ProblemDef(
+        status=502,
+        title="Database authorization failed",
+        default_detail="The server could not access the database provider.",
+    ),
+    "analysis_job_create_failed": ProblemDef(
+        status=502,
+        title="Analysis job creation failed",
+        default_detail="The server could not create the analysis job.",
+    ),
 }
 
 

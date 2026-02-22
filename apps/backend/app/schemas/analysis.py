@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.config import settings
+from app.schemas.analysis_jobs import AnalysisJobStatus
 
 SOURCE_TYPE_TO_MIME: dict[str, str] = {
     "pdf": "application/pdf",
@@ -114,3 +115,5 @@ class VerifyAuthenticityRequest(BaseModel):
 class VerifyAuthenticityResponse(BaseModel):
     success: bool | None = None
     message: str
+    jobId: str | None = None
+    status: AnalysisJobStatus | None = None
