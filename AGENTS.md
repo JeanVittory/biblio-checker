@@ -4,8 +4,8 @@
 
 Agents MUST follow this order of reference when making decisions:
 
-1. PRODUCT_VISION.md → Strategic direction (why the product exists)
-2. SYSTEM_SPEC.md → System behavior and contracts (how it must behave)
+1. docs/PRODUCT_VISION.md → Strategic direction (why the product exists)
+2. docs/spec/SYSTEM_SPEC.md → System behavior and contracts (how it must behave)
 3. apps/*/AGENTS.md → Implementation rules (how to build it)
 4. Source code → Current implementation details
 
