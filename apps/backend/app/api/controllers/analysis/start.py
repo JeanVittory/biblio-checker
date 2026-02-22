@@ -3,12 +3,12 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.problems import problem_response
-from app.core.supabase_storage import SupabaseStorageError, download_object_bytes
 from app.schemas.analysis import VerifyAuthenticityRequest, VerifyAuthenticityResponse
 from app.services.integrity import (
     IntegrityShaMismatchError,
     verify_sha256_bytes,
 )
+from app.services.supabase_storage import SupabaseStorageError, download_object_bytes
 from app.services.text_extraction import (
     TextExtractionError,
     extract_text_from_bytes_async,

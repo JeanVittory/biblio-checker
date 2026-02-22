@@ -84,7 +84,7 @@ async def test_sha_mismatch_returns_problem_json():
 
 @pytest.mark.anyio
 async def test_storage_not_found_returns_problem_json():
-    from app.core.supabase_storage import SupabaseStorageError
+    from app.services.supabase_storage import SupabaseStorageError
 
     with patch(
         "app.api.controllers.analysis.start.download_object_bytes",

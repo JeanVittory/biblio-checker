@@ -3,11 +3,13 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from typing import Final
-from urllib.parse import quote
 
 import httpx
+from anyio.to_thread import run_sync
+from storage3.exceptions import StorageApiError
 
 from app.core.config import settings
+from app.core.supabase_client import SupabaseClientError, get_supabase_admin_client
 
 _DEFAULT_TIMEOUT_SECONDS: Final[float] = 30.0
 _CHUNK_SIZE: Final[int] = 64 * 1024
@@ -19,35 +21,62 @@ class SupabaseStorageError(Exception):
     detail: str | None = None
 
 
-def _object_url(bucket: str, path: str) -> str:
-    base = (settings.supabase_url or "").rstrip("/")
-    return (
-        f"{base}/storage/v1/object/"
-        f"{quote(bucket, safe='')}/{quote(path, safe='/')}"
-    )
+async def _create_signed_download_url(*, bucket: str, path: str) -> str:
+    try:
+        supabase = get_supabase_admin_client()
+    except SupabaseClientError as exc:
+        raise SupabaseStorageError(code=exc.code, detail=exc.detail) from exc
 
+    def _signed_url_sync() -> str:
+        resp = supabase.storage.from_(bucket).create_signed_url(
+            path, int(settings.supabase_signed_url_ttl_seconds)
+        )
+        signed = None
+        if isinstance(resp, dict):
+            signed = resp.get("signedURL") or resp.get("signedUrl")
+        if not signed:
+            raise SupabaseStorageError(
+                code="storage_download_failed",
+                detail="Could not generate a signed download URL.",
+            )
+        return str(signed)
 
-def _headers() -> dict[str, str]:
-    key = settings.supabase_service_role_key or ""
-    return {
-        "authorization": f"Bearer {key}",
-        "apikey": key,
-    }
+    try:
+        return await run_sync(_signed_url_sync)
+    except SupabaseStorageError:
+        raise
+    except StorageApiError as exc:
+        status = str(exc.status)
+        if status == "404":
+            raise SupabaseStorageError(
+                code="storage_not_found", detail=exc.message
+            ) from exc
+        if status in ("401", "403"):
+            raise SupabaseStorageError(
+                code="storage_unauthorized", detail=exc.message
+            ) from exc
+        raise SupabaseStorageError(
+            code="storage_download_failed",
+            detail=f"Signed URL generation failed with status {exc.status}.",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise SupabaseStorageError(
+            code="storage_download_failed", detail=str(exc) or None
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise SupabaseStorageError(
+            code="storage_download_failed", detail=str(exc) or None
+        ) from exc
+
 
 async def download_object_bytes(bucket: str, path: str) -> bytes:
-    if not (settings.supabase_url or "").strip() or not (
-        settings.supabase_service_role_key or ""
-    ).strip():
-        raise SupabaseStorageError(code="server_misconfigured")
-
-    url = _object_url(bucket, path)
-    headers = _headers()
+    url = await _create_signed_download_url(bucket=bucket, path=path)
 
     try:
         async with httpx.AsyncClient(
             timeout=_DEFAULT_TIMEOUT_SECONDS, follow_redirects=True
         ) as client:
-            async with client.stream("GET", url, headers=headers) as resp:
+            async with client.stream("GET", url) as resp:
                 if resp.status_code == 404:
                     raise SupabaseStorageError(code="storage_not_found")
                 if resp.status_code in (401, 403):
@@ -86,19 +115,48 @@ async def download_object_bytes(bucket: str, path: str) -> bytes:
 
 
 def compute_object_sha256(bucket: str, path: str) -> str:
-    if not (settings.supabase_url or "").strip() or not (
-        settings.supabase_service_role_key or ""
-    ).strip():
-        raise SupabaseStorageError(code="server_misconfigured")
+    try:
+        supabase = get_supabase_admin_client()
+    except SupabaseClientError as exc:
+        raise SupabaseStorageError(code=exc.code, detail=exc.detail) from exc
 
-    url = _object_url(bucket, path)
-    headers = _headers()
+    try:
+        resp = supabase.storage.from_(bucket).create_signed_url(
+            path, int(settings.supabase_signed_url_ttl_seconds)
+        )
+        url = None
+        if isinstance(resp, dict):
+            url = resp.get("signedURL") or resp.get("signedUrl")
+        if not url:
+            raise SupabaseStorageError(
+                code="storage_download_failed",
+                detail="Could not generate a signed download URL.",
+            )
+    except StorageApiError as exc:
+        status = str(exc.status)
+        if status == "404":
+            raise SupabaseStorageError(
+                code="storage_not_found", detail=exc.message
+            ) from exc
+        if status in ("401", "403"):
+            raise SupabaseStorageError(
+                code="storage_unauthorized", detail=exc.message
+            ) from exc
+        raise SupabaseStorageError(
+            code="storage_download_failed",
+            detail=f"Signed URL generation failed with status {exc.status}.",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise SupabaseStorageError(
+            code="storage_download_failed", detail=str(exc) or None
+        ) from exc
 
     try:
         with httpx.Client(
-            timeout=_DEFAULT_TIMEOUT_SECONDS, follow_redirects=True
+            timeout=_DEFAULT_TIMEOUT_SECONDS,
+            follow_redirects=True,
         ) as client:
-            with client.stream("GET", url, headers=headers) as resp:
+            with client.stream("GET", str(url)) as resp:
                 if resp.status_code == 404:
                     raise SupabaseStorageError(code="storage_not_found")
                 if resp.status_code in (401, 403):
