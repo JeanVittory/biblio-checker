@@ -9,6 +9,7 @@ dependencies = [
   "httpx",
   "pdfminer.six",
   "pydantic-settings",
+  "supabase",
   "python-docx",
   "uvicorn[standard]",
 ]

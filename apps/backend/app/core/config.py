@@ -1,10 +1,14 @@
 import json
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        env_file_encoding="utf-8",
+    )
 
     app_name: str = "Biblio Checker API"
     environment: str = "development"
@@ -15,6 +19,7 @@ class Settings(BaseSettings):
     allowed_buckets: str = "uploads"
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    supabase_signed_url_ttl_seconds: int = 60
     max_file_size_bytes: int = 10 * 1024 * 1024  # 10 MB
     max_extracted_text_chars: int = 1_000_000
 

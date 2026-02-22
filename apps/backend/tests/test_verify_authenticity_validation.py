@@ -9,6 +9,7 @@ from app.main import app
 
 DUMMY_CONTENT = b"dummy"
 DUMMY_SHA256 = hashlib.sha256(DUMMY_CONTENT).hexdigest()
+DUMMY_JOB_ID = "e8d916e8-72b5-4ba8-bca3-602a0ddf7d26"
 
 VALID_PAYLOAD = {
     "requestId": "4806aa68-ed88-4205-ae86-cc085eb463fd",
@@ -62,11 +63,16 @@ async def test_happy_path():
     ), patch(
         "app.api.controllers.analysis.start.extract_text_from_bytes_async",
         new=AsyncMock(return_value="dummy text"),
+    ), patch(
+        "app.api.controllers.analysis.start.create_analysis_job",
+        new=AsyncMock(return_value={"id": DUMMY_JOB_ID}),
     ):
         resp = await _post(VALID_PAYLOAD)
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
+    assert body["jobId"] == DUMMY_JOB_ID
+    assert body["status"] == "queued"
 
 
 @pytest.mark.anyio
@@ -84,7 +90,7 @@ async def test_sha_mismatch_returns_problem_json():
 
 @pytest.mark.anyio
 async def test_storage_not_found_returns_problem_json():
-    from app.core.supabase_storage import SupabaseStorageError
+    from app.services.supabase_storage import SupabaseStorageError
 
     with patch(
         "app.api.controllers.analysis.start.download_object_bytes",

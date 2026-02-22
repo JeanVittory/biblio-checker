@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
-from app.core.supabase_storage import compute_object_sha256
+from app.services.supabase_storage import compute_object_sha256
 
 
 @dataclass(frozen=True)
