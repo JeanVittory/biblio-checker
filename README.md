@@ -18,6 +18,22 @@ apps/
   worker/     - Python worker 
 ```
 
+## Documentation & Specs
+
+Read order (source of truth):
+
+1. `docs/PRODUCT_VISION.md` — product intent (why)
+2. `docs/spec/SYSTEM_SPEC.md` — system behavior + contracts (what)
+3. `spec/` — Spec-Driven Development (SDD) feature suites (functional requirements)
+4. `apps/*/README.md` and `apps/*/AGENTS.md` — implementation guidance (how)
+
+Entry points:
+
+- `docs/README.md` — docs index
+- `spec/README.md` — SDD/specs index
+- `.claude/README.md` — Claude sub-agents for SDD workflow
+- `spec/recent-analyses/README.md` — Recent Analyses (queued jobs + polling) spec suite
+
 ## Prerequisites
 
 - Node 20+
