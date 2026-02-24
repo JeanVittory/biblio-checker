@@ -38,8 +38,11 @@ export const UPLOAD_PATHS = {
 
 export const HTTP_STATUS = {
   BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  NOT_FOUND: 404,
   INTERNAL_SERVER_ERROR: 500,
   BAD_GATEWAY: 502,
+  GATEWAY_TIMEOUT: 504,
 } as const;
 
 export const UPLOAD_MESSAGES = {
@@ -68,6 +71,7 @@ export enum API_ROUTES {
   SIGNED_UPLOAD = "/api/signed-upload",
   ANALYSIS_START_GATEWAY = "/api/analysis-start-gateway",
   CLEANUP_UPLOAD = "/api/cleanup-upload",
+  JOBS_STATUS = "/api/jobs/status",
 }
 
 export const BACKEND_ROUTES = {
