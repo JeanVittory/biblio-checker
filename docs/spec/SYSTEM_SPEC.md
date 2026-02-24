@@ -4,7 +4,7 @@
 
 Biblio Checker validates bibliographic references from user-provided academic documents. The system’s intent is **evidence-based verification** against real, open academic sources; it does not generate citations.
 
-Behaviorally, the system is: **UI → signed upload to storage → gateway forwards start request → backend validates + creates job row → worker processes job**. As of today, the worker exists as a polling-loop stub and does not yet advance jobs beyond creation.
+Behaviorally, the system is: **UI → signed upload to storage → gateway forwards start request → backend validates + creates job row → UI tracks the job and polls for status → worker (future) processes job**. As of today, the worker exists as a polling-loop stub and may not advance jobs beyond creation.
 
 This document specifies **behavior and contracts** (endpoints, invariants, job lifecycle, error semantics) rather than implementation details.
 
@@ -18,7 +18,8 @@ This document specifies **behavior and contracts** (endpoints, invariants, job l
 4. The UI uploads bytes to Supabase Storage via the signed URL (direct PUT).
 5. The UI requests analysis start (`POST /api/analysis-start-gateway`) with `requestId`, document metadata, and the storage locator (`bucket`, `path`).
 6. The gateway forwards to the backend (`POST /api/analysis/start`) after computing integrity, and the backend creates an `analysis_jobs` row.
-7. Backend returns `jobId` and `status="queued"`. The current UI shows a generic success state and does not persist `jobId`.
+7. Backend returns `jobId`, `status="queued"`, and a short-lived `jobToken` (1-hour TTL).
+8. The UI stores the job in localStorage (“Recent Analyses”) and starts polling for status every 4 seconds.
 
 ### Relevant Failure Flows
 
@@ -40,7 +41,7 @@ Key behavioral fields:
 - **Identity**: `id` (exposed as `jobId`).
 - **Lifecycle**: `status`, `stage`.
 - **Input reference**: `bucket`, `path`, `sha256`.
-- **Outcome**: `result_json` on success; `error_code`/`error_detail` on failure.
+- **Outcome**: `results` (DB) / `result` (API) on success; `error` on failure.
 - **Retries**: `attempts`, `max_attempts`.
 
 ### Job Lifecycle (Status + Stage)
@@ -49,17 +50,15 @@ Key behavioral fields:
 
 - `queued`: created and waiting to be processed.
 - `running`: actively being processed by a worker.
-- `succeeded`: processing completed successfully; `result_json` is expected.
+- `succeeded`: processing completed successfully; `results` is expected.
 - `failed`: processing completed unsuccessfully; error fields are expected.
 
 **Stage** (fine-grained progress marker; may change while running). The table constrains `stage` to:
 
 - `created`: job row exists; no processing has started yet.
-- `extract_done`: document text was extracted and is ready for verification.
 - `langgraph_running`: orchestration flow is running.
 - `verifying_references`: reference verification is in progress.
-- `persisting_result`: system is persisting the final `result_json`.
-- `done`: processing is complete (paired with `succeeded` or `failed`).
+- `persisting_result`: system is persisting the final `results`.
 
 **Current system behavior**: backend creates jobs with `status="queued"` and `stage="created"`. Worker-driven transitions are not implemented yet.
 
@@ -94,7 +93,7 @@ Request semantics (minimum):
 
 Response semantics:
 
-- Success: `ok: true`, `success: true`, includes backend success payload (with `jobId` and `status="queued"`).
+- Success: `ok: true`, `success: true`, includes backend success payload (with `jobId`, `status="queued"`, and `jobToken`).
 - Failure: `ok: false`, `success: false`. On gateway-detected failure or backend failure, the system attempts best-effort deletion of the uploaded object.
 
 #### `POST /api/cleanup-upload`
@@ -123,16 +122,56 @@ Request invariants (enforced):
 
 Response semantics:
 
-- Success: `{success: true, jobId, status: "queued"}`
+- Success: `{success: true, jobId, status: "queued", jobToken}`
 - Errors:
   - Validation: 422.
   - Operational failures: `application/problem+json` with stable `code`.
 
+#### `GET /api/analysis/status`
+
+Purpose: retrieve job status (and result/error when available) using `jobId` + `jobToken`.
+
+Request semantics (minimum):
+
+- Query params: `jobId`, `jobToken` (required).
+- Token checks:
+  - Token must match the stored token for the job.
+  - Token must not be expired (current TTL is 1 hour).
+- Enumeration-resistant behavior:
+  - If the job does not exist OR the token is invalid/expired, the backend responds with a generic message.
+
+Response semantics:
+
+- Success (200): `{ jobId, status, stage?, result?, error?, submittedAt, completedAt? }`
+- Notes: the backend stores the success payload in a `results` column and returns it as `result` in the status response.
+- Invalid/expired token: 401 with `{ error: "Invalid or expired token" }`
+- Job not found (or treated as not found): 404 with `{ error: "Invalid or expired token" }`
+- Transient service failure: 502 with `{ error: "Service temporarily unavailable" }`
+
+### Frontend Status Proxy + Polling (Recent Analyses)
+
+The UI uses a server-side proxy endpoint to poll the backend without exposing internal service URLs in the browser.
+
+#### `GET /api/jobs/status`
+
+- Purpose: proxy to backend `GET /api/analysis/status`.
+- Query params: `jobId`, `jobToken` (required).
+- Timeout: upstream request has a hard timeout (30 seconds).
+
+Polling behavior (as implemented):
+
+- Interval: every **4 seconds** per active job.
+- Polling active statuses: `queued`, `running`.
+- Terminal statuses: `succeeded`, `failed` (polling stops automatically).
+- If the proxy returns **401** or **404**, the UI marks the job as **`expired`** (frontend-only state) and stops polling.
+- Transient failures (network errors, 502): silently retried on the next interval.
+- Persistence: jobs are stored in browser localStorage and polling resumes on page load for `queued`/`running` jobs.
+
 ## UI Recovery Contract
 
-**As implemented today, the UI is ephemeral.** A page reload does not restore progress, does not re-attach to an existing `jobId`, and does not offer a resume view. The user must re-upload and restart.
+**As implemented today, the UI persists Recent Analyses state in localStorage.** A page reload restores the job list and resumes polling for any jobs still in `queued` or `running` status (per stored data).
 
-Implication: jobs may exist server-side after a successful start, but they are not user-recoverable through the current UI. If recovery is required later, a read API and UI persistence mechanism must be defined.
+Implication: jobs are recoverable on the same browser/device as long as localStorage is retained and the job token has not expired.
 
 ## Error Taxonomy
 
@@ -168,17 +207,16 @@ Backend operational errors use `application/problem+json` with a stable `code`, 
 
 - Uploaded file cleanup is **best-effort** and primarily triggered on gateway-detected failures (download failure, backend failure, unexpected errors).
 - On successful analysis start, there is **no automatic deletion** of the uploaded document.
-- The worker does not yet persist `result_json`, so “result retention” is not defined by runtime behavior.
+- The worker does not yet persist `results`, so “result retention” is not defined by runtime behavior.
 
 **Target policy (not yet implemented)**
 
 - Uploaded files and results should be retained for **7 days** and then removed.
-- Enforcing this requires a scheduled cleanup mechanism and a decision on whether `result_json` may outlive the underlying file bytes.
+- Enforcing this requires a scheduled cleanup mechanism and a decision on whether `results` may outlive the underlying file bytes.
 
 ## Assumptions and Pending Decisions
 
-- **Final report contract**: the structure of `result_json` is not yet defined. A stable, minimal schema is required before the frontend can render results beyond “started/success”.
-- **Job retrieval contract**: there is currently no API contract to fetch job status or results by `jobId`. If `jobId` is to be used as a public opaque identifier, a read endpoint and matching access controls (e.g., RLS policy intent) must be defined.
-- **Worker semantics**: polling selection criteria, concurrency, idempotency, transitions for `status`/`stage`, and retry behavior (`attempts`, `max_attempts`) are not implemented yet.
+- **Final report contract**: the structure of `results` is not yet defined. A stable, minimal schema is required before the frontend can render results beyond “started/success”.
+- **Worker semantics**: selection criteria, concurrency, idempotency, transitions for `status`/`stage`, and retry behavior (`attempts`, `max_attempts`) are not implemented yet.
 - **Retention enforcement**: 7-day retention is a target, but cleanup scheduling and the authoritative deletion source (storage vs. DB vs. both) remain to be implemented.
 - **Verification Logic**: TBD — will be formalized in a dedicated domain spec once LangGraph orchestration is stabilized.
