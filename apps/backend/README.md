@@ -39,6 +39,15 @@ tests/
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/analysis/start` | Start analysis |
+| `GET` | `/api/analysis/status` | Get job status (requires `jobId` + `jobToken`) |
+
+### Job Tokens (Recent Analyses)
+
+The backend issues a `jobToken` when a job is created:
+
+- Returned by `POST /api/analysis/start` alongside `jobId` and `status="queued"`.
+- Required by `GET /api/analysis/status` to prevent job ID enumeration.
+- Short-lived: current TTL is **1 hour** (expired tokens return a generic 401/404 message).
 
 ## Environment Variables
 
