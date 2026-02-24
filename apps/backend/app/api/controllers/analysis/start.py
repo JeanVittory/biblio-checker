@@ -1,3 +1,6 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -38,12 +41,17 @@ async def start_analysis(
             max_chars=int(settings.max_extracted_text_chars),
         )
 
+        job_token = secrets.token_urlsafe(32)
+        token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
         job_row = {
             "status": AnalysisJobStatus.QUEUED.value,
             "stage": AnalysisJobStage.CREATED.value,
             "bucket": payload.storage.bucket,
             "path": payload.storage.path,
             "sha256": payload.integrity.sha256,
+            "job_token": job_token,
+            "token_expires_at": token_expires_at.isoformat(),
         }
         inserted = await create_analysis_job(job_row)
         job_id = (
@@ -75,4 +83,5 @@ async def start_analysis(
         success=True,
         jobId=str(job_id),
         status=AnalysisJobStatus.QUEUED,
+        jobToken=job_token,
     )

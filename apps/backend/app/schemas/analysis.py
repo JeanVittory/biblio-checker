@@ -1,5 +1,6 @@
+from datetime import datetime
 from pathlib import PurePosixPath
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -117,3 +118,14 @@ class VerifyAuthenticityResponse(BaseModel):
     message: str
     jobId: str | None = None
     status: AnalysisJobStatus | None = None
+    jobToken: str | None = None
+
+
+class JobStatusResponse(BaseModel):
+    jobId: str
+    status: AnalysisJobStatus
+    stage: str | None = None
+    result: Any | None = None
+    error: str | None = None
+    submittedAt: datetime
+    completedAt: datetime | None = None
