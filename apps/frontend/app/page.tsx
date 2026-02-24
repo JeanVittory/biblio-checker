@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { FileDropzone } from "@/components/file-dropzone";
 import { UploadStatus } from "@/components/upload-status";
 import { BackgroundGrid } from "@/components/background-grid";
+import { RecentAnalyses } from "@/components/RecentAnalyses/RecentAnalyses";
 import { simulateProgress, sourceTypeFromFileName } from "@/lib/utils";
 import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
 import type { UploadState } from "@/types/upload";
@@ -14,6 +15,15 @@ import { signedUploadService } from "@/services/signedUpload";
 import { uploadFileService } from "@/services/uploadFile";
 import { cleanupUploadService } from "@/services/cleanupUpload";
 import { startAnalysisGatewayService } from "@/services/startAnalysisGateway";
+import { useRecentAnalysesPolling } from "@/hooks/useRecentAnalysesPolling";
+
+/**
+ * Detects whether the localStorage entry for recent analyses exists but is
+ * unparseable / has an unexpected schema (i.e. the data is present but
+ * `readJobs` silently returned []). We inline the key rather than importing
+ * it because it is not part of the public storage API.
+ */
+const RECENT_ANALYSES_STORAGE_KEY = "biblio-checker:recent-analyses";
 
 const initialState: UploadState = {
   status: "idle",
@@ -25,6 +35,41 @@ const initialState: UploadState = {
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>(initialState);
+
+  const { jobs, addTrackedJob, removeTrackedJob } = useRecentAnalysesPolling();
+
+  /**
+   * True when a QuotaExceededError was thrown by `addTrackedJob`. Cleared on
+   * the next successful upload. Passed to <RecentAnalyses> to surface a banner.
+   */
+  const [storageFullError, setStorageFullError] = useState(false);
+
+  /**
+   * Detected once on component mount: the localStorage key is present but
+   * `readJobs()` returned [] (indicating the value is corrupted or has an
+   * unrecognised schema version).
+   */
+  const [storageCorruptedError] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const raw = localStorage.getItem(RECENT_ANALYSES_STORAGE_KEY);
+    // Key is absent → no data at all, not corruption.
+    if (raw === null) return false;
+    // Key is present — try to parse as the expected schema.
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        (parsed as Record<string, unknown>).version !== 1 ||
+        !Array.isArray((parsed as Record<string, unknown>).jobs)
+      ) {
+        return true;
+      }
+    } catch {
+      return true;
+    }
+    return false;
+  });
 
   const handleFileSelect = useCallback((selected: File | null) => {
     setFile(selected);
@@ -187,6 +232,44 @@ export default function Home() {
         error: null,
         fileName: file.name,
       });
+
+      // Attempt to track the job in the Recent Analyses table. The upload
+      // is already confirmed successful at this point, so any failure here
+      // is non-fatal and must not block the user.
+      const backendPayload =
+        typeof checkObj.backend === "object" && checkObj.backend !== null
+          ? (checkObj.backend as Record<string, unknown>)
+          : null;
+
+      const jobId =
+        backendPayload !== null && typeof backendPayload.jobId === "string"
+          ? backendPayload.jobId
+          : null;
+
+      const jobToken =
+        backendPayload !== null && typeof backendPayload.jobToken === "string"
+          ? backendPayload.jobToken
+          : null;
+
+      if (jobId === null || jobToken === null) {
+        console.warn(
+          "Upload succeeded but job tracking failed: missing jobId or jobToken"
+        );
+      } else {
+        try {
+          setStorageFullError(false);
+          addTrackedJob(jobId, jobToken, file.name || "Document");
+        } catch (trackingError) {
+          if (
+            trackingError instanceof DOMException &&
+            trackingError.name === "QuotaExceededError"
+          ) {
+            setStorageFullError(true);
+          } else {
+            console.warn("Upload succeeded but job tracking failed:", trackingError);
+          }
+        }
+      }
     } catch {
       await attemptCleanup();
       stopProgress();
@@ -271,6 +354,13 @@ export default function Home() {
             </button>
           )}
         </div>
+
+        <RecentAnalyses
+          jobs={jobs}
+          onRemoveJob={removeTrackedJob}
+          storageFullError={storageFullError}
+          storageCorruptedError={storageCorruptedError}
+        />
       </main>
 
       {/* Footer */}
