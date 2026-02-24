@@ -69,3 +69,24 @@ pnpm lint       # run ESLint
 pnpm build      # production build
 pnpm start      # serve production build
 ```
+
+## Recent Analyses (Queued Jobs + Polling)
+
+The frontend tracks recently submitted analysis jobs in browser localStorage and polls the backend for status updates.
+
+**Polling details (concrete):**
+
+- **Proxy endpoint:** `GET /api/jobs/status?jobId=<id>&jobToken=<token>`
+- **Upstream target:** backend `GET /api/analysis/status`
+- **Interval:** every **4 seconds**
+- **Active polling statuses:** `queued`, `running`
+- **Terminal statuses:** `succeeded`, `failed` (polling stops automatically)
+- **Token invalid/expired:** proxy returns **401/404** → UI marks job as `expired` (frontend-only) and stops polling
+- **Transient failures (network/502):** retried on the next interval
+
+**Key files:**
+
+- `apps/frontend/hooks/useRecentAnalysesPolling.ts` — polling lifecycle + localStorage sync
+- `apps/frontend/app/api/jobs/status/route.ts` — server-side proxy (with upstream timeout)
+- `apps/frontend/components/RecentAnalyses/RecentAnalyses.tsx` — table UI
+- `apps/frontend/lib/storage/recentAnalyses.ts` — localStorage schema + helpers

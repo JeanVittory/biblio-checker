@@ -4,6 +4,8 @@
 
 Python worker that will consume Supabase rows and trigger a LangGraph analysis flow. In this first iteration it only provides the project structure and a runnable polling loop stub.
 
+> Note: this worker “polling loop” is **server-side**. It is separate from the **frontend polling** used by the “Recent Analyses” UI (which polls job status every 4 seconds via the frontend proxy route).
+
 ## Tech Stack
 
 - **Python** 3.12.x
