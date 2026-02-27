@@ -22,6 +22,7 @@ import {
   type JobStatus,
 } from "@/lib/storage/recentAnalyses";
 import { API_ROUTES, HTTP_STATUS } from "@/lib/constants";
+import { parseResultsV1 } from "@/lib/validation/resultsV1";
 
 const POLL_INTERVAL_MS = 4_000;
 
@@ -152,7 +153,9 @@ export function useRecentAnalysesPolling(): UseRecentAnalysesPollingResult {
         if (status !== undefined) updates.status = status;
         if (typeof data.stage === "string") updates.stage = data.stage;
         if (typeof data.stage === "object") updates.stage = null; // reset if backend clears it
-        if ("result" in data) updates.result = data.result;
+        if ("result" in data) {
+          updates.result = parseResultsV1(data.result);
+        }
         if (typeof data.error === "string") updates.error = data.error;
         if (typeof data.completedAt === "string") updates.completedAt = data.completedAt;
 

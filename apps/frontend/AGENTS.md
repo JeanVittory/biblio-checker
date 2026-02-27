@@ -22,6 +22,21 @@
 - **Start analysis**: `app/api/analysis-start-gateway/route.ts` downloads the file from Supabase, computes SHA256, and forwards the request to the backend FastAPI service.
 - **Cleanup uploads**: `app/api/cleanup-upload/route.ts` deletes uploaded files from Supabase Storage.
 
+## Results Contract v1 (`result` payload)
+
+The analysis success payload returned as `result` is governed by **Results Contract v1**.
+
+- Source of truth (as implemented):
+  - Backend model: `apps/backend/app/schemas/results.py`
+  - Frontend TypeScript contract: `apps/frontend/types/results.ts`
+  - Frontend runtime validator: `apps/frontend/lib/validation/resultsV1.ts`
+- Coherence rule (normative): any change to the `result` contract MUST update both `apps/backend/app/schemas/results.py` and `apps/frontend/types/results.ts` (and `apps/frontend/lib/validation/resultsV1.ts`) in the same change set.
+- Runtime validation is REQUIRED before treating network data as `ResultsV1`:
+  - Zod schema + parser: `apps/frontend/lib/validation/resultsV1.ts`
+  - Polling integration (parses `data.result`): `apps/frontend/hooks/useRecentAnalysesPolling.ts`
+- Rendering MUST degrade gracefully:
+  - If `result` is present but invalid/unsupported, the UI must show an “unsupported/invalid results format” message and a best-effort raw JSON view.
+
 ## Build, Test, and Development Commands
 
 Use `pnpm` from the repo root or this directory:

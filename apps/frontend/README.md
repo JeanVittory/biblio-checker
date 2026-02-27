@@ -88,5 +88,5 @@ The frontend tracks recently submitted analysis jobs in browser localStorage and
 
 - `apps/frontend/hooks/useRecentAnalysesPolling.ts` — polling lifecycle + localStorage sync
 - `apps/frontend/app/api/jobs/status/route.ts` — server-side proxy (with upstream timeout)
-- `apps/frontend/components/RecentAnalyses/RecentAnalyses.tsx` — table UI
+- `apps/frontend/components/RecentAnalyses.tsx` — table UI
 - `apps/frontend/lib/storage/recentAnalyses.ts` — localStorage schema + helpers

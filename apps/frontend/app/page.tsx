@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { FileDropzone } from "@/components/file-dropzone";
 import { UploadStatus } from "@/components/upload-status";
 import { BackgroundGrid } from "@/components/background-grid";
-import { RecentAnalyses } from "@/components/RecentAnalyses/RecentAnalyses";
+import { RecentAnalyses } from "@/components/RecentAnalyses";
 import { simulateProgress, sourceTypeFromFileName } from "@/lib/utils";
 import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
 import type { UploadState } from "@/types/upload";
@@ -252,9 +252,7 @@ export default function Home() {
           : null;
 
       if (jobId === null || jobToken === null) {
-        console.warn(
-          "Upload succeeded but job tracking failed: missing jobId or jobToken"
-        );
+        console.warn("Upload succeeded but job tracking failed: missing jobId or jobToken");
       } else {
         try {
           setStorageFullError(false);
@@ -280,7 +278,7 @@ export default function Home() {
         fileName: file.name,
       });
     }
-  }, [file]);
+  }, [file, addTrackedJob]);
 
   const handleReset = useCallback(() => {
     setFile(null);

@@ -50,51 +50,124 @@ function formatRelativeTime(isoString: string): string {
   return `${diffDays}d ago`;
 }
 
-// ---------------------------------------------------------------------------
-// Status badge sub-component
-// ---------------------------------------------------------------------------
+function formatElapsedTime(isoString: string): string {
+  const elapsedMs = Date.now() - new Date(isoString).getTime();
+  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
+  if (elapsedMinutes < 1) return "less than a minute";
+  return `${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"}`;
+}
 
 interface StatusBadgeProps {
   status: JobStatus;
 }
 
 function StatusBadge({ status }: StatusBadgeProps) {
-  const base =
-    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium";
+  const base = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium";
 
   switch (status) {
     case "queued":
       return (
-        <span aria-label="queued" className={cn(base, "bg-amber-500/15 text-amber-500 border border-amber-500/30")}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span
+          aria-label="queued"
+          className={cn(base, "bg-amber-500/15 text-amber-500 border border-amber-500/30")}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
           Queued
         </span>
       );
     case "running":
       return (
-        <span aria-label="running" className={cn(base, "bg-blue-500/15 text-blue-400 border border-blue-500/30")}>
+        <span
+          aria-label="running"
+          className={cn(base, "bg-blue-500/15 text-blue-400 border border-blue-500/30")}
+        >
           <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
           Running
         </span>
       );
     case "succeeded":
       return (
-        <span aria-label="succeeded" className={cn(base, "bg-green-500/15 text-green-400 border border-green-500/30")}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <span
+          aria-label="succeeded"
+          className={cn(base, "bg-green-500/15 text-green-400 border border-green-500/30")}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
           Succeeded
         </span>
       );
     case "failed":
       return (
-        <span aria-label="failed" className={cn(base, "bg-red-500/15 text-red-400 border border-red-500/30")}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span
+          aria-label="failed"
+          className={cn(base, "bg-red-500/15 text-red-400 border border-red-500/30")}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
           Failed
         </span>
       );
     case "expired":
       return (
-        <span aria-label="expired" className={cn(base, "bg-surface text-muted border border-border")}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span
+          aria-label="expired"
+          className={cn(base, "bg-surface text-muted border border-border")}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           Expired
         </span>
       );
@@ -111,8 +184,7 @@ interface ExpandedDetailProps {
 }
 
 function ExpandedDetail({ job, panelId }: ExpandedDetailProps) {
-  const panelBase =
-    "px-4 py-3 text-sm border-t border-border bg-background/50";
+  const panelBase = "px-4 py-3 text-sm border-t border-border bg-background/50";
 
   switch (job.status) {
     case "queued":
@@ -123,41 +195,68 @@ function ExpandedDetail({ job, panelId }: ExpandedDetailProps) {
       );
 
     case "running": {
-      const elapsedMs = Date.now() - new Date(job.submittedAt).getTime();
-      const elapsedMinutes = Math.floor(elapsedMs / 60_000);
-      const elapsedLabel =
-        elapsedMinutes < 1 ? "less than a minute" : `${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"}`;
+      const elapsedLabel = formatElapsedTime(job.submittedAt);
 
       return (
         <div id={panelId} role="region" className={panelBase}>
           {job.stage ? (
             <p className="text-muted">
               <span className="font-medium text-foreground">Stage: </span>
-              {job.stage}{" "}
-              <span className="text-muted">(processing for {elapsedLabel})</span>
+              {job.stage} <span className="text-muted">(processing for {elapsedLabel})</span>
             </p>
           ) : (
-            <p className="text-muted italic">
-              Processing... (started {elapsedLabel} ago)
-            </p>
+            <p className="text-muted italic">Processing... (started {elapsedLabel} ago)</p>
           )}
         </div>
       );
     }
 
     case "succeeded":
+      if (job.result === null) {
+        return (
+          <div id={panelId} role="region" className={cn(panelBase, "space-y-2")}>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-500">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Unsupported or invalid results format</span>
+            </div>
+            {job.completedAt !== null && (
+              <p className="text-xs text-muted">Completed {formatRelativeTime(job.completedAt)}</p>
+            )}
+          </div>
+        );
+      }
       return (
-        <div id={panelId} role="region" className={cn(panelBase, "space-y-2")}>
-          <p className="font-medium text-foreground text-xs uppercase tracking-wide text-muted">
-            Result
+        <div id={panelId} role="region" className={cn(panelBase, "space-y-3")}>
+          <p className="font-medium text-foreground text-xs uppercase tracking-wide">
+            Analysis Result
           </p>
-          <pre className="overflow-x-auto rounded-lg bg-surface border border-border p-3 text-xs text-foreground leading-relaxed">
-            {JSON.stringify(job.result, null, 2)}
-          </pre>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-surface border border-border p-2">
+              <p className="text-muted">References detected</p>
+              <p className="font-semibold text-foreground">
+                {job.result.summary.totalReferencesDetected}
+              </p>
+            </div>
+            <div className="rounded-lg bg-surface border border-border p-2">
+              <p className="text-muted">References analyzed</p>
+              <p className="font-semibold text-foreground">
+                {job.result.summary.totalReferencesAnalyzed}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-lg bg-surface border border-border p-2 text-xs space-y-1">
+            <p className="text-muted font-medium">By classification</p>
+            {(Object.entries(job.result.summary.countsByClassification) as [string, number][])
+              .filter(([, count]) => count > 0)
+              .map(([key, count]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="text-muted">{key.replace(/_/g, " ")}</span>
+                  <span className="font-semibold text-foreground">{count}</span>
+                </div>
+              ))}
+          </div>
           {job.completedAt !== null && (
-            <p className="text-xs text-muted">
-              Completed {formatRelativeTime(job.completedAt)}
-            </p>
+            <p className="text-xs text-muted">Completed {formatRelativeTime(job.completedAt)}</p>
           )}
         </div>
       );
@@ -170,9 +269,7 @@ function ExpandedDetail({ job, panelId }: ExpandedDetailProps) {
             {job.error ?? "An unknown error occurred during processing."}
           </p>
           {job.completedAt !== null && (
-            <p className="text-xs text-muted">
-              Failed {formatRelativeTime(job.completedAt)} ago
-            </p>
+            <p className="text-xs text-muted">Failed {formatRelativeTime(job.completedAt)} ago</p>
           )}
         </div>
       );
@@ -222,15 +319,12 @@ function JobRow({ job, onRemove }: JobRowProps) {
     [job.jobId, onRemove]
   );
 
-  const handleRemoveKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>) => {
-      // Allow Space/Enter to activate without bubbling to the row.
-      if (e.key === " " || e.key === "Enter") {
-        e.stopPropagation();
-      }
-    },
-    []
-  );
+  const handleRemoveKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Allow Space/Enter to activate without bubbling to the row.
+    if (e.key === " " || e.key === "Enter") {
+      e.stopPropagation();
+    }
+  }, []);
 
   return (
     <tbody>
@@ -275,7 +369,7 @@ function JobRow({ job, onRemove }: JobRowProps) {
               className={cn(
                 "flex items-center justify-center rounded-md p-1 transition-colors",
                 "text-muted hover:text-foreground hover:bg-border/50",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-1"
+                "focus-visible:outline focus-visible:outline-accent focus-visible:outline-offset-1"
               )}
             >
               {expanded ? (
@@ -294,7 +388,7 @@ function JobRow({ job, onRemove }: JobRowProps) {
               className={cn(
                 "flex items-center justify-center rounded-md p-1 transition-colors",
                 "text-muted hover:text-red-400 hover:bg-red-500/10",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400 focus-visible:outline-offset-1"
+                "focus-visible:outline  focus-visible:outline-red-400 focus-visible:outline-offset-1"
               )}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -375,10 +469,7 @@ export function RecentAnalyses({
 
   return (
     <section aria-labelledby={`${tableId}-heading`} className="w-full space-y-3">
-      <h3
-        id={`${tableId}-heading`}
-        className="text-sm font-semibold text-foreground"
-      >
+      <h3 id={`${tableId}-heading`} className="text-sm font-semibold text-foreground">
         Recent Analyses
       </h3>
 
