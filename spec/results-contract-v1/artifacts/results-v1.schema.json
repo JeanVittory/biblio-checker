@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://biblio-checker/spec/results-contract-v1/results-v1.schema.json",
+  "title": "ResultsV1",
+  "description": "Results Contract v1 — normative JSON Schema for the results payload produced by the analysis system.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "reportLanguage",
+    "pipeline",
+    "summary",
+    "references",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "reportLanguage": { "const": "es" },
+    "pipeline": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["totalReferencesDetected", "totalReferencesAnalyzed", "countsByClassification"],
+      "additionalProperties": false,
+      "properties": {
+        "totalReferencesDetected": { "type": "integer", "minimum": 0 },
+        "totalReferencesAnalyzed": { "type": "integer", "minimum": 0 },
+        "countsByClassification": {
+          "type": "object",
+          "required": [
+            "verified",
+            "likely_verified",
+            "ambiguous",
+            "not_found",
+            "suspicious",
+            "processing_error"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "verified":          { "type": "integer", "minimum": 0 },
+            "likely_verified":   { "type": "integer", "minimum": 0 },
+            "ambiguous":         { "type": "integer", "minimum": 0 },
+            "not_found":         { "type": "integer", "minimum": 0 },
+            "suspicious":        { "type": "integer", "minimum": 0 },
+            "processing_error":  { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ReferenceResult" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Warning" }
+    }
+  },
+  "$defs": {
+    "NormalizedReference": {
+      "type": "object",
+      "required": ["title", "authors", "year", "venue", "doi", "arxivId"],
+      "additionalProperties": false,
+      "properties": {
+        "title":   { "type": ["string", "null"] },
+        "authors": { "type": "array", "items": { "type": "string" } },
+        "year":    { "type": ["integer", "null"] },
+        "venue":   { "type": ["string", "null"] },
+        "doi":     { "type": ["string", "null"] },
+        "arxivId": { "type": ["string", "null"] }
+      }
+    },
+    "MatchedRecord": {
+      "type": "object",
+      "required": ["externalId", "title", "year", "doi", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "externalId": { "type": "string", "minLength": 1 },
+        "title":      { "type": ["string", "null"] },
+        "year":       { "type": ["integer", "null"] },
+        "doi":        { "type": ["string", "null"] },
+        "url":        { "type": ["string", "null"] }
+      }
+    },
+    "EvidenceItem": {
+      "type": "object",
+      "required": ["source", "matchType", "score", "matchedRecord"],
+      "additionalProperties": false,
+      "properties": {
+        "source":        { "type": "string", "minLength": 1 },
+        "matchType":     { "type": "string", "minLength": 1 },
+        "score":         { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "matchedRecord": { "$ref": "#/$defs/MatchedRecord" }
+      }
+    },
+    "Warning": {
+      "type": "object",
+      "required": ["code", "message", "referenceId", "details"],
+      "additionalProperties": false,
+      "properties": {
+        "code":        { "type": "string", "minLength": 1 },
+        "message":     { "type": "string", "minLength": 1 },
+        "referenceId": { "type": ["string", "null"] },
+        "details":     { "type": ["object", "null"] }
+      }
+    },
+    "ReferenceResultBase": {
+      "type": "object",
+      "required": [
+        "referenceId",
+        "rawText",
+        "normalized",
+        "classification",
+        "confidenceScore",
+        "confidenceBand",
+        "manualReviewRequired",
+        "reasonCode",
+        "decisionReason",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "referenceId":          { "type": "string", "minLength": 1 },
+        "rawText":              { "type": "string", "minLength": 1 },
+        "normalized":           { "$ref": "#/$defs/NormalizedReference" },
+        "classification":       {
+          "type": "string",
+          "enum": ["verified", "likely_verified", "ambiguous", "not_found", "suspicious", "processing_error"]
+        },
+        "confidenceScore":      {
+          "oneOf": [
+            { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            { "type": "null" }
+          ]
+        },
+        "confidenceBand":       {
+          "oneOf": [
+            { "type": "string", "enum": ["very_high", "high", "medium", "low", "very_low"] },
+            { "type": "null" }
+          ]
+        },
+        "manualReviewRequired": { "type": "boolean" },
+        "reasonCode":           {
+          "type": "string",
+          "enum": [
+            "exact_doi_match",
+            "exact_identifier_match",
+            "strong_metadata_match",
+            "multiple_plausible_candidates",
+            "insufficient_metadata",
+            "no_match_any_source",
+            "strong_doi_conflict",
+            "cross_source_metadata_conflict",
+            "source_timeout_partial",
+            "reference_processing_failure"
+          ]
+        },
+        "decisionReason":       { "type": "string", "minLength": 1 },
+        "evidence":             {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceItem" }
+        }
+      }
+    },
+    "ReferenceResult": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ReferenceResultBase" },
+            {
+              "properties": {
+                "classification":       { "const": "verified" },
+                "confidenceBand":       { "enum": ["high", "very_high"] },
+                "manualReviewRequired": { "const": false }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ReferenceResultBase" },
+            {
+              "properties": {
+                "classification":       { "const": "likely_verified" },
+                "confidenceBand":       { "enum": ["medium", "high"] },
+                "manualReviewRequired": { "const": false }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ReferenceResultBase" },
+            {
+              "properties": {
+                "classification":       { "const": "ambiguous" },
+                "confidenceBand":       { "enum": ["low", "medium"] },
+                "manualReviewRequired": { "const": true }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ReferenceResultBase" },
+            {
+              "properties": {
+                "classification":       { "const": "not_found" },
+                "confidenceBand":       { "enum": ["very_low", "low"] },
+                "manualReviewRequired": { "const": true }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ReferenceResultBase" },
+            {
+              "properties": {
+                "classification":       { "const": "suspicious" },
+                "confidenceBand":       { "enum": ["medium", "high", "very_high"] },
+                "manualReviewRequired": { "const": true }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ReferenceResultBase" },
+            {
+              "properties": {
+                "classification":       { "const": "processing_error" },
+                "confidenceBand":       { "type": "null" },
+                "confidenceScore":      { "type": "null" },
+                "manualReviewRequired": { "const": true }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

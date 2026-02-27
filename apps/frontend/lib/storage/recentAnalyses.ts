@@ -1,3 +1,5 @@
+import type { ResultsV1 } from "@/types/results";
+
 /**
  * Persistent storage layer for recent analysis jobs.
  *
@@ -18,7 +20,7 @@ export interface StoredJob {
   submittedAt: string;
   status: JobStatus;
   stage: string | null;
-  result: unknown | null;
+  result: ResultsV1 | null;
   error: string | null;
   /** ISO 8601 or null */
   completedAt: string | null;
@@ -152,8 +154,11 @@ export function updateJob(jobId: string, updates: Partial<StoredJob>): void {
   const current = jobs[index];
 
   // Protect immutable identity fields.
-  const { jobId: _id, jobToken: _token, fileName: _name, submittedAt: _at, ...safeUpdates } =
-    updates;
+  const { jobId: immutableJobId, jobToken, fileName, submittedAt, ...safeUpdates } = updates;
+  void immutableJobId;
+  void jobToken;
+  void fileName;
+  void submittedAt;
 
   jobs[index] = { ...current, ...safeUpdates };
 

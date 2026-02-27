@@ -143,10 +143,158 @@ Request semantics (minimum):
 Response semantics:
 
 - Success (200): `{ jobId, status, stage?, result?, error?, submittedAt, completedAt? }`
-- Notes: the backend stores the success payload in a `results` column and returns it as `result` in the status response.
+- Notes:
+  - The backend stores the success payload in a `results` column and returns it as `result` in the status response.
+  - `result` is meaningful only when `status="succeeded"`:
+    - If `status != "succeeded"`, `result` MUST be `null` or absent.
+    - If `status="succeeded"` and the stored payload does not validate as Results Contract v1, `result` MUST be returned as `null` (backward compatibility; the job `status` MUST NOT change).
 - Invalid/expired token: 401 with `{ error: "Invalid or expired token" }`
 - Job not found (or treated as not found): 404 with `{ error: "Invalid or expired token" }`
 - Transient service failure: 502 with `{ error: "Service temporarily unavailable" }`
+
+### Result Payload Contract (Results Contract v1)
+
+The system has a **strict, versioned** contract for the analysis success payload:
+
+- DB column name (typical): `analysis_jobs.results`
+- API field name: `result` (returned by `GET /api/analysis/status` on success)
+
+**Source of truth (as implemented):**
+
+- Backend (authoritative validation model): `apps/backend/app/schemas/results.py`
+- Frontend (authoritative TS contract): `apps/frontend/types/results.ts`
+- Frontend (authoritative runtime validator): `apps/frontend/lib/validation/resultsV1.ts`
+
+**Coherence rule (normative):**
+
+- Any change to the `result` contract MUST be applied to **both** backend and frontend sources of truth above (and their tests) in the same change set.
+  - If you update the backend model, you MUST update the frontend types + Zod validator to match.
+  - If you update the frontend types, you MUST update the backend model to match.
+
+Note: `spec/results-contract-v1/` documents the v1 contract snapshot used for this feature, but it may be superseded by future specs; the code-level schemas/types above are the authoritative contract for the running system.
+
+#### Presence / absence rules
+
+- `result` MUST be treated as defined only when `status="succeeded"`.
+- When `status != "succeeded"`, `result` MUST be `null` or absent.
+- When `status="succeeded"`:
+  - If stored `results` validates as Results Contract v1, the backend returns it as `result`.
+  - If stored `results` is missing/legacy/invalid, the backend returns `result=null` (backward compatibility; it MUST NOT crash and MUST NOT change job status).
+
+#### Root object shape (ResultsV1, `schemaVersion="1.0"`)
+
+`result` is a JSON object with **required** fields:
+
+- `schemaVersion`: string, MUST equal `"1.0"`.
+- `reportLanguage`: string, MUST equal `"es"`.
+- `pipeline`: object, required:
+  - `name`: string, required, non-empty.
+  - `version`: string, required, non-empty.
+- `summary`: object, required (see below).
+- `references`: array of `ReferenceResult`, required (may be empty).
+- `warnings`: array of `Warning`, required (may be empty).
+
+#### `summary`
+
+Required fields:
+
+- `totalReferencesDetected`: integer, `>= 0`.
+- `totalReferencesAnalyzed`: integer, `>= 0`.
+- `countsByClassification`: object with **all** classification keys exactly once, values are integers `>= 0`:
+  - `verified`, `likely_verified`, `ambiguous`, `not_found`, `suspicious`, `processing_error`
+
+#### `references[]` items (`ReferenceResult`)
+
+Each item is an object with **required** fields:
+
+- `referenceId`: string, required, non-empty; MUST be unique within the report.
+- `rawText`: string, required, non-empty.
+- `normalized`: object, required:
+  - `title`: string or `null`
+  - `authors`: array of strings (may be empty)
+  - `year`: integer or `null`
+  - `venue`: string or `null`
+  - `doi`: string or `null`
+  - `arxivId`: string or `null`
+- `classification`: `classification` enum (closed; see below).
+- `confidenceScore`: number in `[0.0, 1.0]` or `null` (see matrix/nullability rules below).
+- `confidenceBand`: `confidenceBand` enum or `null` (see matrix/nullability rules below).
+- `manualReviewRequired`: boolean (forced by classification; see below).
+- `reasonCode`: `reasonCode` enum (closed; see below).
+- `decisionReason`: string, required, non-empty; user-facing Spanish explanation.
+- `evidence`: array of `EvidenceItem`, required (may be empty).
+
+#### `evidence[]` items (`EvidenceItem`)
+
+Each evidence item is an object with **required** fields:
+
+- `source`: string, required, non-empty.
+- `matchType`: string, required, non-empty.
+- `score`: number, required, MUST be in `[0.0, 1.0]`.
+- `matchedRecord`: object, required:
+  - `externalId`: string, required, non-empty.
+  - `title`: string or `null`
+  - `year`: integer or `null`
+  - `doi`: string or `null`
+  - `url`: string or `null`
+
+#### `warnings[]` items (`Warning`)
+
+Each warning is an object with **required** fields:
+
+- `code`: string, required, non-empty (stable identifier).
+- `message`: string, required, non-empty; user-facing Spanish explanation.
+- `referenceId`: string or `null` (when warning applies to a specific reference).
+- `details`: object or `null` (free-form diagnostic payload).
+
+#### Closed enums (v1)
+
+- `classification`:
+  - `verified`, `likely_verified`, `ambiguous`, `not_found`, `suspicious`, `processing_error`
+- `confidenceBand`:
+  - `very_high`, `high`, `medium`, `low`, `very_low`
+- `reasonCode`:
+  - `exact_doi_match`
+  - `exact_identifier_match`
+  - `strong_metadata_match`
+  - `multiple_plausible_candidates`
+  - `insufficient_metadata`
+  - `no_match_any_source`
+  - `strong_doi_conflict`
+  - `cross_source_metadata_conflict`
+  - `source_timeout_partial`
+  - `reference_processing_failure`
+
+#### Compatibility matrix + forced nullability (v1)
+
+For each `ReferenceResult`, the pair (`classification`, `confidenceBand`) MUST satisfy:
+
+- `verified` → `confidenceBand ∈ { high, very_high }`
+- `likely_verified` → `confidenceBand ∈ { medium, high }`
+- `ambiguous` → `confidenceBand ∈ { low, medium }`
+- `not_found` → `confidenceBand ∈ { very_low, low }`
+- `suspicious` → `confidenceBand ∈ { medium, high, very_high }`
+- `processing_error` → `confidenceBand = null`
+
+If `classification = "processing_error"` then:
+
+- `confidenceBand` MUST be `null`
+- `confidenceScore` MUST be `null`
+- `manualReviewRequired` MUST be `true`
+
+`manualReviewRequired` MUST be:
+
+- `false` for `classification ∈ { verified, likely_verified }`
+- `true` for `classification ∈ { ambiguous, not_found, suspicious, processing_error }`
+
+#### Cross-field invariants (v1)
+
+The report MUST satisfy:
+
+- `references.length == summary.totalReferencesAnalyzed`
+- `sum(summary.countsByClassification[*]) == summary.totalReferencesAnalyzed`
+- `summary.totalReferencesAnalyzed <= summary.totalReferencesDetected`
+- `referenceId` values MUST be unique within `references[]`
 
 ### Frontend Status Proxy + Polling (Recent Analyses)
 
@@ -216,7 +364,7 @@ Backend operational errors use `application/problem+json` with a stable `code`, 
 
 ## Assumptions and Pending Decisions
 
-- **Final report contract**: the structure of `results` is not yet defined. A stable, minimal schema is required before the frontend can render results beyond “started/success”.
+- **Final report contract**: The authoritative `result` contract is the code-level schema/types (`apps/backend/app/schemas/results.py`, `apps/frontend/types/results.ts`, `apps/frontend/lib/validation/resultsV1.ts`). Feature specs may be superseded over time.
 - **Worker semantics**: selection criteria, concurrency, idempotency, transitions for `status`/`stage`, and retry behavior (`attempts`, `max_attempts`) are not implemented yet.
 - **Retention enforcement**: 7-day retention is a target, but cleanup scheduling and the authoritative deletion source (storage vs. DB vs. both) remain to be implemented.
 - **Verification Logic**: TBD — will be formalized in a dedicated domain spec once LangGraph orchestration is stabilized.

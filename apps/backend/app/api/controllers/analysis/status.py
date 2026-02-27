@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.schemas.analysis import JobStatusResponse
 from app.schemas.analysis_jobs import AnalysisJobStatus
+from app.schemas.results import ResultsV1
 from app.services.analysis_jobs_repo import AnalysisJobsRepoError, get_analysis_job_by_id
 
 router = APIRouter()
@@ -93,7 +94,16 @@ async def get_job_status(
             if completed_at.tzinfo is None:
                 completed_at = completed_at.replace(tzinfo=timezone.utc)
 
-    result = row.get("results") if status == AnalysisJobStatus.SUCCEEDED else None
+    result: ResultsV1 | None = None
+    if status == AnalysisJobStatus.SUCCEEDED:
+        raw_results = row.get("results")
+        if raw_results is not None:
+            try:
+                result = ResultsV1.model_validate(raw_results)
+            except Exception:
+                # Backward compat: invalid/legacy payload → return null, no crash.
+                result = None
+
     error = row.get("error") if status == AnalysisJobStatus.FAILED else None
 
     return JobStatusResponse(

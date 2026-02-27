@@ -49,6 +49,21 @@ Request validates:
 - Path security: no traversal (`..`), no absolute paths, no backslashes, no null bytes
 - Integrity: SHA256 hash (64 hex characters)
 
+## Results Contract v1 (`results` / `result`)
+
+The analysis success payload is governed by **Results Contract v1**.
+
+- Source of truth (as implemented):
+  - Backend validation model: `apps/backend/app/schemas/results.py`
+  - Frontend TypeScript contract: `apps/frontend/types/results.ts`
+  - Frontend runtime validator: `apps/frontend/lib/validation/resultsV1.ts`
+- Coherence rule (normative): any change to the `result` contract MUST update both `apps/backend/app/schemas/results.py` and `apps/frontend/types/results.ts` (and `apps/frontend/lib/validation/resultsV1.ts`) in the same change set.
+- API contract: `GET /api/analysis/status` returns `result` only when `status="succeeded"`.
+- Backward compatibility: if a stored payload is missing/legacy/invalid, the backend MUST return `result=null` (and MUST NOT crash or change the job status).
+- Implementation pointers:
+  - Results Pydantic model: `apps/backend/app/schemas/results.py`
+  - Status endpoint validation behavior: `apps/backend/app/api/controllers/analysis/status.py`
+
 ## Conventions
 
 - Always run code via `uv run ...` to ensure the venv interpreter is used (avoid relying on `python`/pyenv shims).
