@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.core.config import settings
 from app.schemas.analysis_jobs import AnalysisJobStatus
+from app.schemas.results import ResultsV1
 
 SOURCE_TYPE_TO_MIME: dict[str, str] = {
     "pdf": "application/pdf",
@@ -125,7 +126,7 @@ class JobStatusResponse(BaseModel):
     jobId: str
     status: AnalysisJobStatus
     stage: str | None = None
-    result: Any | None = None
+    result: ResultsV1 | None = None
     error: str | None = None
     submittedAt: datetime
     completedAt: datetime | None = None
