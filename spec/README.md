@@ -13,4 +13,4 @@ Each feature lives in `spec/<feature>/` and typically includes:
 ## Suites
 
 - `spec/recent-analyses/` — “Recent Analyses” (job tracking + localStorage persistence + status polling).
-
+- `spec/results-contract-v1/` — “Results Contract v1” (normative `results` / `result` JSON schema + enums + validation requirements).
