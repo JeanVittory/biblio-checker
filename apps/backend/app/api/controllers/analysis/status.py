@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -8,7 +8,11 @@ from fastapi.responses import JSONResponse
 from app.schemas.analysis import JobStatusResponse
 from app.schemas.analysis_jobs import AnalysisJobStatus
 from app.schemas.results import ResultsV1
-from app.services.analysis_jobs_repo import AnalysisJobsRepoError, get_analysis_job_by_id
+from app.services.analysis_jobs_repo import (
+    AnalysisJobsRepoError,
+    get_analysis_job_by_id,
+)
+from app.utils.datetime_coercion import coerce_utc_datetime
 
 router = APIRouter()
 
@@ -52,47 +56,30 @@ async def get_job_status(
     if not raw_expires_at:
         return _INVALID_TOKEN_RESPONSE
 
-    if isinstance(raw_expires_at, str):
-        # Supabase returns ISO 8601 strings; parse and ensure UTC-aware
-        expires_at = datetime.fromisoformat(raw_expires_at)
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-    elif isinstance(raw_expires_at, datetime):
-        expires_at = raw_expires_at
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-    else:
+    try:
+        expires_at = coerce_utc_datetime(raw_expires_at, field="token_expires_at")
+    except ValueError:
         return _INVALID_TOKEN_RESPONSE
 
-    if datetime.now(timezone.utc) >= expires_at:
+    if datetime.now(UTC) >= expires_at:
         return _INVALID_TOKEN_RESPONSE
 
     # Build the response — never include job_token or token_expires_at
     status = AnalysisJobStatus(row["status"])
 
     raw_created_at = row.get("created_at")
-    if isinstance(raw_created_at, str):
-        submitted_at = datetime.fromisoformat(raw_created_at)
-        if submitted_at.tzinfo is None:
-            submitted_at = submitted_at.replace(tzinfo=timezone.utc)
-    elif isinstance(raw_created_at, datetime):
-        submitted_at = raw_created_at
-        if submitted_at.tzinfo is None:
-            submitted_at = submitted_at.replace(tzinfo=timezone.utc)
-    else:
+    try:
+        submitted_at = coerce_utc_datetime(raw_created_at, field="created_at")
+    except ValueError:
         return _SERVICE_UNAVAILABLE_RESPONSE
 
     raw_completed_at = row.get("completed_at")
     completed_at: datetime | None = None
     if raw_completed_at is not None:
-        if isinstance(raw_completed_at, str):
-            completed_at = datetime.fromisoformat(raw_completed_at)
-            if completed_at.tzinfo is None:
-                completed_at = completed_at.replace(tzinfo=timezone.utc)
-        elif isinstance(raw_completed_at, datetime):
-            completed_at = raw_completed_at
-            if completed_at.tzinfo is None:
-                completed_at = completed_at.replace(tzinfo=timezone.utc)
+        try:
+            completed_at = coerce_utc_datetime(raw_completed_at, field="completed_at")
+        except ValueError:
+            return _SERVICE_UNAVAILABLE_RESPONSE
 
     result: ResultsV1 | None = None
     if status == AnalysisJobStatus.SUCCEEDED:

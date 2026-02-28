@@ -162,8 +162,7 @@ The system has a **strict, versioned** contract for the analysis success payload
 **Source of truth (as implemented):**
 
 - Backend (authoritative validation model): `apps/backend/app/schemas/results.py`
-- Frontend (authoritative TS contract): `apps/frontend/types/results.ts`
-- Frontend (authoritative runtime validator): `apps/frontend/lib/validation/resultsV1.ts`
+- Frontend (authoritative schema + parser; types derived): `apps/frontend/lib/schemas/resultsV1.ts`
 
 **Coherence rule (normative):**
 
@@ -364,7 +363,7 @@ Backend operational errors use `application/problem+json` with a stable `code`, 
 
 ## Assumptions and Pending Decisions
 
-- **Final report contract**: The authoritative `result` contract is the code-level schema/types (`apps/backend/app/schemas/results.py`, `apps/frontend/types/results.ts`, `apps/frontend/lib/validation/resultsV1.ts`). Feature specs may be superseded over time.
+- **Final report contract**: The authoritative `result` contract is the code-level schema/types (`apps/backend/app/schemas/results.py`, `apps/frontend/lib/schemas/resultsV1.ts`). Feature specs may be superseded over time.
 - **Worker semantics**: selection criteria, concurrency, idempotency, transitions for `status`/`stage`, and retry behavior (`attempts`, `max_attempts`) are not implemented yet.
 - **Retention enforcement**: 7-day retention is a target, but cleanup scheduling and the authoritative deletion source (storage vs. DB vs. both) remain to be implemented.
 - **Verification Logic**: TBD — will be formalized in a dedicated domain spec once LangGraph orchestration is stabilized.

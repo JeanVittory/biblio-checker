@@ -9,11 +9,12 @@
 - `services/`: Client-side API service calls (signedUpload, uploadFile, startAnalysis, cleanupUpload).
 - `lib/`: Shared utilities and server helpers.
   - `lib/constants.ts`: App-wide constants, enums, error messages.
-  - `lib/supabaseAdmin.ts`: Supabase admin client (server-only).
-  - `lib/utils.ts`: File validation, sanitization, formatting helpers.
-  - `lib/validation/`: Zod schemas for request validation (bibliographyCheck, signUploadURL, cleanupUpload, env).
+  - `lib/schemas/`: Zod schemas + inferred TypeScript types (requests, env, results contract).
+  - `lib/supabase/`: Supabase admin client (server-only).
+  - `lib/file.ts`: File validation/sanitization helpers for uploads.
+  - `lib/localStorage/`: localStorage persistence for recent jobs.
+  - `lib/time.ts`: Time formatting helpers (relative/elapsed).
   - `lib/server/`: Server-only helpers (e.g., storage cleanup).
-- `types/`: Shared TypeScript types for API payloads/responses.
 - `public/`: Static assets served at `/`.
 
 ## Key Flows
@@ -28,11 +29,10 @@ The analysis success payload returned as `result` is governed by **Results Contr
 
 - Source of truth (as implemented):
   - Backend model: `apps/backend/app/schemas/results.py`
-  - Frontend TypeScript contract: `apps/frontend/types/results.ts`
-  - Frontend runtime validator: `apps/frontend/lib/validation/resultsV1.ts`
-- Coherence rule (normative): any change to the `result` contract MUST update both `apps/backend/app/schemas/results.py` and `apps/frontend/types/results.ts` (and `apps/frontend/lib/validation/resultsV1.ts`) in the same change set.
+  - Frontend schema + parser (types derived): `apps/frontend/lib/schemas/resultsV1.ts`
+- Coherence rule (normative): any change to the `result` contract MUST update both `apps/backend/app/schemas/results.py` and `apps/frontend/lib/schemas/resultsV1.ts` in the same change set.
 - Runtime validation is REQUIRED before treating network data as `ResultsV1`:
-  - Zod schema + parser: `apps/frontend/lib/validation/resultsV1.ts`
+  - Zod schema + parser: `apps/frontend/lib/schemas/resultsV1.ts`
   - Polling integration (parses `data.result`): `apps/frontend/hooks/useRecentAnalysesPolling.ts`
 - Rendering MUST degrade gracefully:
   - If `result` is present but invalid/unsupported, the UI must show an “unsupported/invalid results format” message and a best-effort raw JSON view.

@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { Upload, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { validateFile, formatFileSize } from "@/lib/utils";
+import { validateFile, formatFileSize } from "@/lib/file";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
 
 interface FileDropzoneProps {

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { getSupabaseAdminClient } from "@/lib/supabase/supabaseAdmin";
 
 export async function cleanupUploadedFile(bucket: string, path: string) {
   try {

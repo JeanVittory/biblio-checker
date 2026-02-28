@@ -1,5 +1,5 @@
 import { API_ROUTES, ENDPOINT_ACTION_TYPES, MIME_TYPES } from "@/lib/constants";
-import { BibliographyCheckBasePayload } from "@/lib/validation/bibliographyCheck";
+import { BibliographyCheckBasePayload } from "@/lib/schemas/bibliographyCheck";
 
 export const startAnalysisGatewayService = async (
   request: BibliographyCheckBasePayload
