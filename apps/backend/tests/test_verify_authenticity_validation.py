@@ -61,9 +61,6 @@ async def test_happy_path():
         "app.api.controllers.analysis.start.download_object_bytes",
         new=AsyncMock(return_value=DUMMY_CONTENT),
     ), patch(
-        "app.api.controllers.analysis.start.extract_text_from_bytes_async",
-        new=AsyncMock(return_value="dummy text"),
-    ), patch(
         "app.api.controllers.analysis.start.create_analysis_job",
         new=AsyncMock(return_value={"id": DUMMY_JOB_ID}),
     ):
