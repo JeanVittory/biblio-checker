@@ -20,7 +20,7 @@ import {
   removeJob,
   type StoredJob,
   type JobStatus,
-} from "@/lib/storage/recentAnalyses";
+} from "@/lib/localStorage/recentAnalyses";
 import { API_ROUTES, HTTP_STATUS } from "@/lib/constants";
 import { parseResultsV1 } from "@/lib/schemas/resultsV1";
 

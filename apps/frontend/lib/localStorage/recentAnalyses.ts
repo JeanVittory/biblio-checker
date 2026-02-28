@@ -1,4 +1,4 @@
-import type { ResultsV1 } from "@/types/results";
+import type { ResultsV1 } from "@/lib/schemas/resultsV1";
 
 /**
  * Persistent storage layer for recent analysis jobs.
