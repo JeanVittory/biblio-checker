@@ -39,8 +39,7 @@ When the worker (future) marks a job as `succeeded` and persists `analysis_jobs.
 
 - Source of truth (as implemented):
   - Backend validation model: `apps/backend/app/schemas/results.py`
-  - Frontend TypeScript contract: `apps/frontend/types/results.ts`
-  - Frontend runtime validator: `apps/frontend/lib/validation/resultsV1.ts`
+  - Frontend schema + parser (types derived): `apps/frontend/lib/schemas/resultsV1.ts`
 - Coherence rule (normative): any change to the `result` contract MUST update backend + frontend sources of truth above in the same change set.
 - Security: results MUST NOT include job tokens, signed URLs, or credentials.
 </INSTRUCTIONS>
