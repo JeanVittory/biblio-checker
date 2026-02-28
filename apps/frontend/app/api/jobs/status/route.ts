@@ -26,7 +26,7 @@ const routeEnvSchema = z.object({
   BIBLIO_BACKEND_CHECK_URL: z.string().url(),
 });
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<Response> {
   // --- Validate query parameters ---
   const { searchParams } = request.nextUrl;
   const queryParseResult = querySchema.safeParse({
