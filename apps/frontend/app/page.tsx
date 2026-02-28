@@ -6,7 +6,7 @@ import { FileDropzone } from "@/components/file-dropzone";
 import { UploadStatus } from "@/components/upload-status";
 import { BackgroundGrid } from "@/components/background-grid";
 import { RecentAnalyses } from "@/components/RecentAnalyses";
-import { simulateProgress, sourceTypeFromFileName } from "@/lib/utils";
+import { simulateProgress, sourceTypeFromFileName } from "@/lib/file";
 import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
 import type { UploadState } from "@/lib/schemas/upload";
 import type { BibliographyCheckBasePayload } from "@/lib/schemas/bibliographyCheck";

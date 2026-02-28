@@ -8,7 +8,7 @@ import {
   MIME_TYPES,
   UPLOAD_PATHS,
 } from "@/lib/constants";
-import { extensionFromFileName, sanitizeFileName } from "@/lib/utils";
+import { extensionFromFileName, sanitizeFileName } from "@/lib/file";
 import { getSupabaseAdminClient } from "@/lib/supabase/supabaseAdmin";
 import { signedUploadEnvSchema } from "@/lib/schemas/env";
 import { signedUploadRequestSchema } from "@/lib/schemas/signUploadURL";
