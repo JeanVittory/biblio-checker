@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { signedUploadEnvSchema } from "@/lib/validation/signUploadURL";
+import { signedUploadEnvSchema } from "@/lib/schemas/env";
 import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
-import { cleanupUploadRequestSchema } from "@/lib/validation/cleanupUpload";
+import { cleanupUploadRequestSchema } from "@/lib/schemas/cleanupUpload";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 
 export const runtime = "nodejs";

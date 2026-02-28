@@ -9,8 +9,9 @@ import {
   UPLOAD_PATHS,
 } from "@/lib/constants";
 import { extensionFromFileName, sanitizeFileName } from "@/lib/utils";
-import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { signedUploadEnvSchema, signedUploadRequestSchema } from "@/lib/validation/signUploadURL";
+import { getSupabaseAdminClient } from "@/lib/supabase/supabaseAdmin";
+import { signedUploadEnvSchema } from "@/lib/schemas/env";
+import { signedUploadRequestSchema } from "@/lib/schemas/signUploadURL";
 
 export const runtime = "nodejs";
 

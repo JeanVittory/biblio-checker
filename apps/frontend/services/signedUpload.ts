@@ -1,5 +1,5 @@
 import { API_ROUTES, ENDPOINT_ACTION_TYPES, MIME_TYPES } from "@/lib/constants";
-import { SignedUploadInitResponse } from "@/types/signedUpload";
+import { SignedUploadInitResponse } from "@/lib/schemas/signedUpload";
 
 export const signedUploadService = async (file: File) => {
   const initResponse = await fetch(API_ROUTES.SIGNED_UPLOAD, {

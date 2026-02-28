@@ -1,5 +1,5 @@
 import { BACKEND_ROUTES, ENDPOINT_ACTION_TYPES, MIME_TYPES } from "@/lib/constants";
-import { BibliographyCheckFullPayload } from "@/lib/validation/bibliographyCheck";
+import { BibliographyCheckFullPayload } from "@/lib/schemas/bibliographyCheck";
 
 export const startAnalysisService = async (
   backendUrl: string,

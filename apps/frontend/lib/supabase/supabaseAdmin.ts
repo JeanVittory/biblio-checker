@@ -1,10 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { z } from "zod";
-
-const supabaseEnvSchema = z.object({
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-});
+import { supabaseEnvSchema } from "@/lib/schemas/env";
 
 export function getSupabaseAdminClient() {
   const env = supabaseEnvSchema.parse(process.env);

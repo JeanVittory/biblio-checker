@@ -22,7 +22,7 @@ import {
   type JobStatus,
 } from "@/lib/storage/recentAnalyses";
 import { API_ROUTES, HTTP_STATUS } from "@/lib/constants";
-import { parseResultsV1 } from "@/lib/validation/resultsV1";
+import { parseResultsV1 } from "@/lib/schemas/resultsV1";
 
 const POLL_INTERVAL_MS = 4_000;
 

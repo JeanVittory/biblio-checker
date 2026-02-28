@@ -2,7 +2,7 @@
 
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UploadState } from "@/types/upload";
+import type { UploadState } from "@/lib/schemas/upload";
 
 interface UploadStatusProps {
   state: UploadState;

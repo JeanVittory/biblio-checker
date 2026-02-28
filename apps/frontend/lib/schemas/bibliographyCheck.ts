@@ -33,3 +33,5 @@ export const bibliographyCheckFullSchema = bibliographyCheckBaseSchema.extend({
 
 export type BibliographyCheckBasePayload = z.infer<typeof bibliographyCheckBaseSchema>;
 export type BibliographyCheckFullPayload = z.infer<typeof bibliographyCheckFullSchema>;
+export type ExtractMode = z.infer<typeof extractModeSchema>;
+export type SourceType = z.infer<typeof sourceTypeSchema>;

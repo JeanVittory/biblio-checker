@@ -1,5 +1,5 @@
 import { ENDPOINT_ACTION_TYPES } from "@/lib/constants";
-import { SignedUploadInitResponse } from "@/types/signedUpload";
+import { SignedUploadInitResponse } from "@/lib/schemas/signedUpload";
 
 export const uploadFileService = async (file: File, initData: SignedUploadInitResponse) => {
   if (!initData.signedUrl) return;

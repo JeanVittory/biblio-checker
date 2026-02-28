@@ -8,9 +8,9 @@ import { BackgroundGrid } from "@/components/background-grid";
 import { RecentAnalyses } from "@/components/RecentAnalyses";
 import { simulateProgress, sourceTypeFromFileName } from "@/lib/utils";
 import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
-import type { UploadState } from "@/types/upload";
-import type { BibliographyCheckRequest } from "@/types/bibliographyCheck";
-import { bibliographyCheckBaseSchema } from "@/lib/validation/bibliographyCheck";
+import type { UploadState } from "@/lib/schemas/upload";
+import type { BibliographyCheckBasePayload } from "@/lib/schemas/bibliographyCheck";
+import { bibliographyCheckBaseSchema } from "@/lib/schemas/bibliographyCheck";
 import { signedUploadService } from "@/services/signedUpload";
 import { uploadFileService } from "@/services/uploadFile";
 import { cleanupUploadService } from "@/services/cleanupUpload";
@@ -172,7 +172,7 @@ export default function Home() {
         return;
       }
 
-      const payload: BibliographyCheckRequest = {
+      const payload: BibliographyCheckBasePayload = {
         requestId: initData.requestId,
         extractMode: EXTRACT_MODES.BACKEND_EXTRACT_REFERENCES,
         document: {

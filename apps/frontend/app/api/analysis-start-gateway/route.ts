@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { getSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { getSupabaseAdminClient } from "@/lib/supabase/supabaseAdmin";
 import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
 import {
   bibliographyCheckBaseSchema,
   bibliographyCheckFullSchema,
-} from "@/lib/validation/bibliographyCheck";
-import { routeEnvSchema } from "@/lib/validation/env";
+} from "@/lib/schemas/bibliographyCheck";
+import { routeEnvSchema } from "@/lib/schemas/env";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import { startAnalysisService } from "@/services/startAnalysis";
 
