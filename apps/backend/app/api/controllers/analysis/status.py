@@ -47,24 +47,24 @@ async def get_job_status(
         return _JOB_NOT_FOUND_RESPONSE
 
     # Token comparison
-    stored_token: str | None = row.get("job_token")
+    stored_token: str | None = row.get("poll_status_token")
     if not stored_token or stored_token != jobToken:
         return _INVALID_TOKEN_RESPONSE
 
     # Expiry check
-    raw_expires_at = row.get("token_expires_at")
+    raw_expires_at = row.get("poll_status_token_expires_at")
     if not raw_expires_at:
         return _INVALID_TOKEN_RESPONSE
 
     try:
-        expires_at = coerce_utc_datetime(raw_expires_at, field="token_expires_at")
+        expires_at = coerce_utc_datetime(raw_expires_at, field="poll_status_token_expires_at")
     except ValueError:
         return _INVALID_TOKEN_RESPONSE
 
     if datetime.now(UTC) >= expires_at:
         return _INVALID_TOKEN_RESPONSE
 
-    # Build the response — never include job_token or token_expires_at
+    # Build the response — never include poll_status_token or poll_status_token_expires_at
     status = AnalysisJobStatus(row["status"])
 
     raw_created_at = row.get("created_at")

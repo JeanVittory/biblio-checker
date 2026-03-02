@@ -30,8 +30,8 @@ async def start_analysis(
             sha256=payload.integrity.sha256,
         )
 
-        job_token = secrets.token_urlsafe(32)
-        token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        poll_token = secrets.token_urlsafe(32)
+        poll_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
         job_row = {
             "status": AnalysisJobStatus.QUEUED.value,
@@ -39,8 +39,8 @@ async def start_analysis(
             "bucket": payload.storage.bucket,
             "path": payload.storage.path,
             "sha256": payload.integrity.sha256,
-            "job_token": job_token,
-            "token_expires_at": token_expires_at.isoformat(),
+            "poll_status_token": poll_token,
+            "poll_status_token_expires_at": poll_token_expires_at.isoformat(),
             "source_type": payload.document.sourceType,
         }
         inserted = await create_analysis_job(job_row)
@@ -73,5 +73,5 @@ async def start_analysis(
         success=True,
         jobId=str(job_id),
         status=AnalysisJobStatus.QUEUED,
-        jobToken=job_token,
+        jobToken=poll_token,
     )

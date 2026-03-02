@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     supabase_table: str = "analysis_jobs"
 
     poll_interval_seconds: int = 5
+
+    job_lease_seconds: int = Field(default=300, ge=1, le=3600)
+    job_token_bytes: int = 32
 
 
 settings = Settings()

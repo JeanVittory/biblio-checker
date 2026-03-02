@@ -23,15 +23,15 @@ def _future_expires_at_str(*, with_tz: bool, with_z: bool = False) -> str:
 
 def _make_row(
     *,
-    token_expires_at: object,
+    poll_status_token_expires_at: object,
     created_at: object = "2024-01-01T00:00:00+00:00",
     completed_at: object = None,
 ) -> dict:
     return {
         "id": DUMMY_JOB_ID,
         "status": "running",
-        "job_token": VALID_TOKEN,
-        "token_expires_at": token_expires_at,
+        "poll_status_token": VALID_TOKEN,
+        "poll_status_token_expires_at": poll_status_token_expires_at,
         "created_at": created_at,
         "completed_at": completed_at,
         "stage": "created",
@@ -58,7 +58,7 @@ async def _get(
 async def test_token_expires_at_accepts_naive_datetime():
     future_naive = datetime.now(UTC) + timedelta(hours=1)
     future_naive = future_naive.replace(tzinfo=None)
-    row = _make_row(token_expires_at=future_naive)
+    row = _make_row(poll_status_token_expires_at=future_naive)
 
     with patch(
         "app.api.controllers.analysis.status.get_analysis_job_by_id",
@@ -71,7 +71,7 @@ async def test_token_expires_at_accepts_naive_datetime():
 
 @pytest.mark.anyio
 async def test_token_expires_at_accepts_iso_string_without_tz_assumes_utc():
-    row = _make_row(token_expires_at=_future_expires_at_str(with_tz=False))
+    row = _make_row(poll_status_token_expires_at=_future_expires_at_str(with_tz=False))
 
     with patch(
         "app.api.controllers.analysis.status.get_analysis_job_by_id",
@@ -84,7 +84,7 @@ async def test_token_expires_at_accepts_iso_string_without_tz_assumes_utc():
 
 @pytest.mark.anyio
 async def test_token_expires_at_invalid_type_returns_401():
-    row = _make_row(token_expires_at=123)
+    row = _make_row(poll_status_token_expires_at=123)
 
     with patch(
         "app.api.controllers.analysis.status.get_analysis_job_by_id",
@@ -99,7 +99,7 @@ async def test_token_expires_at_invalid_type_returns_401():
 @pytest.mark.anyio
 async def test_created_at_invalid_returns_502():
     row = _make_row(
-        token_expires_at=_future_expires_at_str(with_tz=True),
+        poll_status_token_expires_at=_future_expires_at_str(with_tz=True),
         created_at=None,
     )
 
@@ -116,7 +116,7 @@ async def test_created_at_invalid_returns_502():
 @pytest.mark.anyio
 async def test_completed_at_none_returns_null_completedAt():
     row = _make_row(
-        token_expires_at=_future_expires_at_str(with_tz=True),
+        poll_status_token_expires_at=_future_expires_at_str(with_tz=True),
         completed_at=None,
     )
 
@@ -134,7 +134,7 @@ async def test_completed_at_none_returns_null_completedAt():
 @pytest.mark.anyio
 async def test_completed_at_invalid_string_returns_502():
     row = _make_row(
-        token_expires_at=_future_expires_at_str(with_tz=True),
+        poll_status_token_expires_at=_future_expires_at_str(with_tz=True),
         completed_at="not-a-date",
     )
 
@@ -151,7 +151,7 @@ async def test_completed_at_invalid_string_returns_502():
 @pytest.mark.anyio
 async def test_iso_strings_with_Z_suffix_are_accepted():
     row = _make_row(
-        token_expires_at=_future_expires_at_str(with_tz=True, with_z=True),
+        poll_status_token_expires_at=_future_expires_at_str(with_tz=True, with_z=True),
         created_at="2024-01-01T00:00:00Z",
         completed_at="2024-01-01T00:01:00Z",
     )
