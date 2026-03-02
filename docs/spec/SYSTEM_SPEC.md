@@ -4,9 +4,11 @@
 
 Biblio Checker validates bibliographic references from user-provided academic documents. The system’s intent is **evidence-based verification** against real, open academic sources; it does not generate citations.
 
-Behaviorally, the system is: **UI → signed upload to storage → gateway forwards start request → backend validates + creates job row → UI tracks the job and polls for status → worker (future) processes job**. As of today, the worker exists as a polling-loop stub and may not advance jobs beyond creation.
+Behaviorally, the system is: **UI → signed upload to storage → gateway forwards start request → backend validates + creates job row → UI tracks the job and polls for status → worker claims and processes jobs**.
 
 This document specifies **behavior and contracts** (endpoints, invariants, job lifecycle, error semantics) rather than implementation details.
+
+**Implementation note (as of 2026-03-02):** the worker pipeline can claim jobs and perform stage/status transitions, but the LangGraph analysis flow is currently stubbed and may yield an empty results payload.
 
 ## User Journeys
 
@@ -19,7 +21,7 @@ This document specifies **behavior and contracts** (endpoints, invariants, job l
 5. The UI requests analysis start (`POST /api/analysis-start-gateway`) with `requestId`, document metadata, and the storage locator (`bucket`, `path`).
 6. The gateway forwards to the backend (`POST /api/analysis/start`) after computing integrity, and the backend creates an `analysis_jobs` row.
 7. Backend returns `jobId`, `status="queued"`, and a short-lived `jobToken` (1-hour TTL).
-8. The UI stores the job in localStorage (“Recent Analyses”) and starts polling for status every 4 seconds.
+8. The UI stores the job in localStorage (“Recent Analyses”) and starts polling for status every 5 seconds via the status proxy (`GET /api/jobs/status`).
 
 ### Relevant Failure Flows
 
@@ -42,7 +44,11 @@ Key behavioral fields:
 - **Lifecycle**: `status`, `stage`.
 - **Input reference**: `bucket`, `path`, `sha256`.
 - **Outcome**: `results` (DB) / `result` (API) on success; `error` on failure.
+- **Auth / leases**:
+  - `poll_status_token`, `poll_status_token_expires_at` — client polling auth (1-hour TTL).
+  - `job_token`, `job_token_expires_at` — worker lease token + expiry for exclusive processing.
 - **Retries**: `attempts`, `max_attempts`.
+- **Timestamps**: `created_at`, `completed_at`.
 
 ### Job Lifecycle (Status + Stage)
 
@@ -56,11 +62,16 @@ Key behavioral fields:
 **Stage** (fine-grained progress marker; may change while running). The table constrains `stage` to:
 
 - `created`: job row exists; no processing has started yet.
+- `extract_done`: source bytes downloaded and integrity-checked.
 - `langgraph_running`: orchestration flow is running.
 - `verifying_references`: reference verification is in progress.
 - `persisting_result`: system is persisting the final `results`.
+- `done`: terminal stage after persisting the final result.
 
-**Current system behavior**: backend creates jobs with `status="queued"` and `stage="created"`. Worker-driven transitions are not implemented yet.
+**Current system behavior (as of 2026-03-02)**:
+
+- Backend creates jobs with `status="queued"` and `stage="created"` and returns a client polling token (`jobToken`).
+- Worker instances claim eligible jobs via an atomic DB RPC (`claim_analysis_job`) and transition them to `status="running"`.
 
 ## External Contracts
 
@@ -105,6 +116,20 @@ Semantics:
 - Rejects unexpected buckets (400).
 - Deletion is attempted, but the endpoint does not guarantee deletion success.
 
+#### `GET /api/jobs/status`
+
+Purpose: transparent proxy to the backend job-status endpoint (`GET /api/analysis/status`).
+
+Request semantics (minimum):
+
+- Query params: `jobId`, `jobToken` (required).
+
+Response semantics:
+
+- Preserves upstream HTTP status codes (e.g., 200/401/404/502).
+- Does not expose the backend base URL or raw token values in error responses or logs.
+- Applies an upstream timeout (30 seconds) and returns 504 on timeout.
+
 ### Backend API (FastAPI)
 
 #### `POST /api/analysis/start`
@@ -135,8 +160,8 @@ Request semantics (minimum):
 
 - Query params: `jobId`, `jobToken` (required).
 - Token checks:
-  - Token must match the stored token for the job.
-  - Token must not be expired (current TTL is 1 hour).
+  - `jobToken` must match the stored polling token (`poll_status_token`) for the job.
+  - Token must not be expired (current TTL is 1 hour via `poll_status_token_expires_at`).
 - Enumeration-resistant behavior:
   - If the job does not exist OR the token is invalid/expired, the backend responds with a generic message.
 
@@ -151,6 +176,18 @@ Response semantics:
 - Invalid/expired token: 401 with `{ error: "Invalid or expired token" }`
 - Job not found (or treated as not found): 404 with `{ error: "Invalid or expired token" }`
 - Transient service failure: 502 with `{ error: "Service temporarily unavailable" }`
+
+### Worker Contract (Job Claiming + Leases)
+
+The worker claims work exclusively using an atomic Postgres RPC and a short-lived lease token.
+
+- RPC: `claim_analysis_job(p_token text, p_lease_secs int DEFAULT 300) → SETOF analysis_jobs`
+- Eligibility:
+  - `status="queued"` jobs are eligible.
+  - `status="running"` jobs become eligible again if their worker lease expiry has passed (`job_token_expires_at < now()`).
+  - `attempts < max_attempts` is always required.
+- Claim transition (simplified):
+  - Sets `status="running"`, sets/extends the worker lease token (`job_token`, `job_token_expires_at`), increments `attempts`, and returns the updated row.
 
 ### Result Payload Contract (Results Contract v1)
 
@@ -171,6 +208,10 @@ The system has a **strict, versioned** contract for the analysis success payload
   - If you update the frontend types, you MUST update the backend model to match.
 
 Note: `spec/results-contract-v1/` documents the v1 contract snapshot used for this feature, but it may be superseded by future specs; the code-level schemas/types above are the authoritative contract for the running system.
+
+**Implementation note (as of 2026-03-02):** the worker currently persists its pipeline output to a `result_json` field, while the backend status endpoint reads `analysis_jobs.results`. Until these are unified, jobs may reach `status="succeeded"` but still return `result=null` via the status API.
+
+**Implementation note (as of 2026-03-02):** the worker persists failures as `error_code` / `error_detail`, while the backend status endpoint currently returns `error` from an `analysis_jobs.error` field. Until these are unified, failed jobs may return `error=null` via the status API.
 
 #### Presence / absence rules
 
@@ -307,7 +348,7 @@ The UI uses a server-side proxy endpoint to poll the backend without exposing in
 
 Polling behavior (as implemented):
 
-- Interval: every **4 seconds** per active job.
+- Interval: every **5 seconds** per active job.
 - Polling active statuses: `queued`, `running`.
 - Terminal statuses: `succeeded`, `failed` (polling stops automatically).
 - If the proxy returns **401** or **404**, the UI marks the job as **`expired`** (frontend-only state) and stops polling.
