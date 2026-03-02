@@ -2,10 +2,22 @@
 
 > Part of the [biblio-checker monorepo](../../AGENTS.md).
 
+## Repo Hygiene (Do Not Read Generated Artifacts)
+
+Agents MUST NOT read, search, or index generated dependency/build directories within the frontend workspace:
+
+- `apps/frontend/node_modules/**`
+- `apps/frontend/.next/**`
+
+When searching, exclude them (unless your tool already ignores them), for example:
+
+- `rg <pattern> apps/frontend --glob '!apps/frontend/node_modules/**' --glob '!apps/frontend/.next/**'`
+
 ## Project Structure & Module Organization
 
 - `app/`: Next.js App Router routes, layouts, and API endpoints (`app/api/**/route.ts`).
 - `components/`: Client UI components (generally `"use client"`).
+- `hooks/`: Client hooks (e.g., `hooks/useRecentAnalysesPolling.ts`).
 - `services/`: Client-side API service calls (signedUpload, uploadFile, startAnalysis, cleanupUpload).
 - `lib/`: Shared utilities and server helpers.
   - `lib/constants.ts`: App-wide constants, enums, error messages.
@@ -19,18 +31,19 @@
 
 ## Key Flows
 
-- **Signed uploads**: `app/api/signed-upload/route.ts` creates a Supabase Storage signed upload URL and returns `{ signedUrl, filePath }` to the client.
-- **Start analysis**: `app/api/analysis-start-gateway/route.ts` downloads the file from Supabase, computes SHA256, and forwards the request to the backend FastAPI service.
+- **Signed uploads**: `app/api/signed-upload/route.ts` creates a Supabase Storage signed upload URL and returns `signedUrl`, `bucket`, `path`, `requestId`, and client expiry hints.
+- **Start analysis (gateway)**: `app/api/analysis-start-gateway/route.ts` downloads the file from Supabase, computes SHA256, validates the payload, and forwards the request to the backend analysis start endpoint.
 - **Cleanup uploads**: `app/api/cleanup-upload/route.ts` deletes uploaded files from Supabase Storage.
+- **Job status polling (proxy + hook)**:
+  - Proxy route: `GET /api/jobs/status?jobId=<id>&jobToken=<token>` (`app/api/jobs/status/route.ts`) forwards to the backend status endpoint and preserves upstream status codes.
+  - Hook: `hooks/useRecentAnalysesPolling.ts` polls every 4 seconds for jobs in `queued`/`running`, stops on `succeeded`/`failed`/`expired`, and marks jobs as `expired` on 401/404.
 
 ## Results Contract v1 (`result` payload)
 
 The analysis success payload returned as `result` is governed by **Results Contract v1**.
 
-- Source of truth (as implemented):
-  - Backend model: `apps/backend/app/schemas/results.py`
-  - Frontend schema + parser (types derived): `apps/frontend/lib/schemas/resultsV1.ts`
-- Coherence rule (normative): any change to the `result` contract MUST update both `apps/backend/app/schemas/results.py` and `apps/frontend/lib/schemas/resultsV1.ts` in the same change set.
+- Frontend source of truth (as implemented): `apps/frontend/lib/schemas/resultsV1.ts` (Zod schema + `parseResultsV1` parser; types derived).
+- Coherence rule (normative): any change to the `result` contract MUST update the frontend schema/parser above and ensure the upstream service returns payloads that validate against it.
 - Runtime validation is REQUIRED before treating network data as `ResultsV1`:
   - Zod schema + parser: `apps/frontend/lib/schemas/resultsV1.ts`
   - Polling integration (parses `data.result`): `apps/frontend/hooks/useRecentAnalysesPolling.ts`
@@ -62,11 +75,16 @@ Use `pnpm` from the repo root or this directory:
 
 ## Testing Guidelines
 
-- No automated test suite is configured yet.
-- Minimum verification for changes (from repo root): `pnpm lint:frontend` + `pnpm --filter frontend exec tsc --noEmit`, and a quick manual run via `pnpm dev:frontend`.
+- Vitest tests exist (e.g., `apps/frontend/lib/schemas/__tests__/resultsV1.test.ts`).
+- Minimum verification for changes (from repo root):
+  - `pnpm lint:frontend`
+  - `pnpm --filter frontend exec tsc --noEmit`
+  - `pnpm --filter frontend exec vitest run`
+  - Quick manual run via `pnpm dev:frontend`
 
 ## Security & Configuration Tips
 
 - Keep `SUPABASE_SERVICE_ROLE_KEY` server-only; never expose it to client components.
 - `BIBLIO_BACKEND_CHECK_URL` is used server-side in the gateway route to reach the FastAPI backend.
+- `app/api/jobs/status/route.ts` must not expose backend URLs or raw job tokens in logs/error responses.
 - Use `.env.local` (see `.env.local.example`) for local config; do not commit secrets.
