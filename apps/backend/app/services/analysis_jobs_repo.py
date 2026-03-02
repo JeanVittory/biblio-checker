@@ -59,9 +59,10 @@ async def create_analysis_job(row: dict[str, Any]) -> dict[str, Any]:
 async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
     """Fetch a single analysis_jobs row by primary key.
 
-    Returns the full row dict (including job_token and token_expires_at) or
-    None when no row with that id exists.  Raises AnalysisJobsRepoError on any
-    DB / client error so callers can map it to a 502 uniformly.
+    Returns the full row dict (including poll_status_token and
+    poll_status_token_expires_at) or None when no row with that id exists.
+    Raises AnalysisJobsRepoError on any DB / client error so callers can map
+    it to a 502 uniformly.
     """
     try:
         supabase = get_supabase_admin_client()
@@ -73,7 +74,7 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
             supabase.table("analysis_jobs")
             .select(
                 "id, status, stage, results, error, created_at, completed_at,"
-                " job_token, token_expires_at"
+                " poll_status_token, poll_status_token_expires_at"
             )
             .eq("id", job_id)
             .limit(1)

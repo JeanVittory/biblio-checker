@@ -5,7 +5,7 @@ status controller (app.api.controllers.analysis.status).
 Strategy
 --------
 All tests mock `get_analysis_job_by_id` so no real database is required.
-A valid job_token ("tok-abc") and a future token_expires_at are injected into
+A valid poll_status_token ("tok-abc") and a future poll_status_token_expires_at are injected into
 every mocked DB row so that the token/expiry guards pass.  The tests focus
 exclusively on how the controller handles the `results` column value from the
 DB, specifically:
@@ -128,8 +128,8 @@ def _make_row(
     return {
         "id": DUMMY_JOB_ID,
         "status": status,
-        "job_token": VALID_TOKEN,
-        "token_expires_at": _FUTURE_EXPIRES_AT,
+        "poll_status_token": VALID_TOKEN,
+        "poll_status_token_expires_at": _FUTURE_EXPIRES_AT,
         "created_at": "2024-01-01T00:00:00+00:00",
         "completed_at": "2024-01-01T00:01:00+00:00" if status in {"succeeded", "failed"} else None,
         "stage": stage,
