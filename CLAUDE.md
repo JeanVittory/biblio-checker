@@ -85,4 +85,13 @@ Never read, search, or index: `**/node_modules/**`, `**/.next/**`, `**/.venv/**`
 
 ## Database
 
-Supabase (PostgreSQL + Storage). Migrations live in `supabase/migrations/`. Job claiming uses an atomic Postgres RPC (`claim_analysis_job`). The `analysis_jobs` table tracks job lifecycle with separate `poll_status_token` (for client polling) and `worker_lease_token` (for worker claims).
+Supabase (PostgreSQL + Storage). Migrations live in `supabase/migrations/`.
+
+Key tables:
+- `analysis_jobs` — job lifecycle with separate `poll_status_token` (for client polling) and `worker_lease_token` (for worker claims).
+- `job_events` — append-only event log tracking job lifecycle transitions (created, claimed, stage changes, succeeded, failed, requeued).
+- `reference_audit_log` — per-reference verification outcomes linked to a job.
+
+Key RPCs:
+- `claim_analysis_job` — atomic job claiming for worker exclusivity.
+- `cleanup_expired_data(p_retention_days)` — deletes expired rows from `analysis_jobs`, `job_events`, and `reference_audit_log`.
