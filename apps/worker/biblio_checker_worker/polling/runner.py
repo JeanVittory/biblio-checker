@@ -30,7 +30,9 @@ def poll_once(*, supabase: Client) -> None:
     if job is None:
         logger.debug("No jobs available.")
         return
-    logger.info("Claimed job id=%s attempt=%d/%d", job.id, job.attempts, job.max_attempts)
+    logger.info(
+        "Claimed job id=%s attempt=%d/%d", job.id, job.attempts, job.max_attempts
+    )
     process_job(supabase=supabase, job=job)
 
 

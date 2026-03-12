@@ -395,16 +395,23 @@ Backend operational errors use `application/problem+json` with a stable `code`, 
 
 - Uploaded file cleanup is **best-effort** and primarily triggered on gateway-detected failures (download failure, backend failure, unexpected errors).
 - On successful analysis start, there is **no automatic deletion** of the uploaded document.
-- The worker does not yet persist `results`, so “result retention” is not defined by runtime behavior.
+- The worker persists pipeline output as `result_json` on the `analysis_jobs` row.
 
-**Target policy (not yet implemented)**
+**DB retention (implemented)**
 
-- Uploaded files and results should be retained for **7 days** and then removed.
-- Enforcing this requires a scheduled cleanup mechanism and a decision on whether `results` may outlive the underlying file bytes.
+- A Postgres function `cleanup_expired_data(p_retention_days)` deletes rows older than the specified retention period from `analysis_jobs`, `job_events`, and `reference_audit_log`.
+- Default retention target: **7 days**.
+- In-progress jobs (`queued`/`running`) and their audit trails are never deleted.
+- Scheduling (cron/pg_cron) is **not yet configured** — the function must be invoked manually or via a future scheduled trigger.
+
+**Storage retention (not yet implemented)**
+
+- Uploaded files in Supabase Storage have no automatic cleanup beyond best-effort gateway deletion on failure.
+- A scheduled mechanism to delete expired Storage objects remains to be implemented.
 
 ## Assumptions and Pending Decisions
 
 - **Final report contract**: The authoritative `result` contract is the code-level schema/types (`apps/backend/app/schemas/results.py`, `apps/frontend/lib/schemas/resultsV1.ts`). Feature specs may be superseded over time.
-- **Worker semantics**: selection criteria, concurrency, idempotency, transitions for `status`/`stage`, and retry behavior (`attempts`, `max_attempts`) are not implemented yet.
-- **Retention enforcement**: 7-day retention is a target, but cleanup scheduling and the authoritative deletion source (storage vs. DB vs. both) remain to be implemented.
+- **Worker semantics**: Selection criteria, concurrency, idempotency, status/stage transitions, and retry behavior are implemented (see `spec/worker-framework/`). Audit event emission at each transition point is defined but not yet wired into the pipeline (`spec/audit-logging/07-integration-points`).
+- **Retention enforcement**: DB-side cleanup is implemented via `cleanup_expired_data(p_retention_days)`. Scheduling (cron) and Storage object cleanup remain to be implemented.
 - **Verification Logic**: TBD — will be formalized in a dedicated domain spec once LangGraph orchestration is stabilized.

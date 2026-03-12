@@ -14,3 +14,5 @@ Each feature lives in `spec/<feature>/` and typically includes:
 
 - `spec/recent-analyses/` — “Recent Analyses” (job tracking + localStorage persistence + status polling).
 - `spec/results-contract-v1/` — “Results Contract v1” (normative `results` / `result` JSON schema + enums + validation requirements).
+- `spec/worker-framework/` — “Worker Framework” (state machine, atomic job claiming, pipeline framework, retry and recovery).
+- `spec/audit-logging/` — “Audit Logging” (job event tracking, reference audit log, data retention cleanup).

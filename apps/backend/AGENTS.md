@@ -62,8 +62,10 @@ Run from `apps/backend/`:
 - `app/services/integrity.py` — SHA256 computation + verification
 - `app/services/analysis_jobs_repo.py` — `analysis_jobs` persistence (create + status lookup)
 - `app/services/text_extraction.py` — extract text from PDF/DOCX bytes (sync + async)
+- `app/schemas/audit_events.py` — `JobEventType` enum (job lifecycle event types)
+- `app/services/audit_repo.py` — audit event insertion (fire-and-forget, async)
 - `app/utils/datetime_coercion.py` — normalize DB timestamps to UTC datetimes
-- `tests/` — pytest tests
+- `tests/` — pytest tests (including `test_audit_repo.py` for audit event insertion)
 
 ## Endpoint Details
 
