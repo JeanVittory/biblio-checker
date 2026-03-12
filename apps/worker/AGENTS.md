@@ -47,7 +47,7 @@ Run from `apps/worker/`:
 - `biblio_checker_worker/core/config.py` — settings loaded from `.env` (see `.env.example`)
 - `biblio_checker_worker/supabase/client.py` — Supabase admin client factory
 - `biblio_checker_worker/polling/runner.py` — polling loop (claims one job per poll)
-- `biblio_checker_worker/jobs/` — job models, enums, repo (DB access), and error types
+- `biblio_checker_worker/jobs/` — job models, enums, repo (DB access), error types, and audit logging (`audit_events.py`, `audit_repo.py`)
 - `biblio_checker_worker/pipeline/` — pipeline runner + shared context + stages
 - `biblio_checker_worker/pipeline/stages/extract.py` — download + SHA256 verification
 - `biblio_checker_worker/pipeline/stages/run_langgraph.py` — stage wrapper around LangGraph flow
@@ -97,7 +97,7 @@ Settings are defined in `biblio_checker_worker/core/config.py` and loaded from `
 
 ## Testing Guidelines
 
-- Minimal pytest coverage currently exists (e.g., `tests/test_imports.py` smoke test).
+- Test coverage includes `tests/test_imports.py` (smoke test), `tests/test_audit_repo.py` (audit event insertion), and shared fixtures in `tests/conftest.py`.
 - Minimum verification:
   - `pnpm test:worker` (or `uv run pytest`)
   - `pnpm lint:worker` / `pnpm format:worker`
