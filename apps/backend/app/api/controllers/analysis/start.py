@@ -1,6 +1,7 @@
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+import structlog
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
@@ -14,6 +15,8 @@ from app.services.integrity import (
 )
 from app.services.supabase_storage import SupabaseStorageError, download_object_bytes
 
+logger = structlog.stdlib.get_logger(__name__)
+
 router = APIRouter()
 
 
@@ -21,6 +24,11 @@ router = APIRouter()
 async def start_analysis(
     payload: VerifyAuthenticityRequest,
 ) -> VerifyAuthenticityResponse | JSONResponse:
+    logger.info(
+        "analysis_start_requested",
+        bucket=payload.storage.bucket,
+        path=payload.storage.path,
+    )
     try:
         content = await download_object_bytes(
             bucket=payload.storage.bucket, path=payload.storage.path
@@ -31,7 +39,7 @@ async def start_analysis(
         )
 
         poll_token = secrets.token_urlsafe(32)
-        poll_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        poll_token_expires_at = datetime.now(UTC) + timedelta(hours=1)
 
         job_row = {
             "status": AnalysisJobStatus.QUEUED.value,
@@ -56,11 +64,27 @@ async def start_analysis(
                 detail_override="DB insert succeeded but no job id was returned.",
             )
 
+        logger.info("analysis_job_created", job_id=job_id)
+
     except SupabaseStorageError as exc:
+        logger.warning(
+            "analysis_start_storage_error",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
         return problem_response(exc.code, detail_override=exc.detail)
     except AnalysisJobsRepoError as exc:
+        logger.warning(
+            "analysis_start_repo_error",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
         return problem_response(exc.code, detail_override=exc.detail)
     except IntegrityShaMismatchError:
+        logger.warning(
+            "analysis_start_sha_mismatch",
+            error_code="integrity_sha_mismatch",
+        )
         return problem_response(
             "integrity_sha_mismatch",
             extra={"requestId": str(payload.requestId)},

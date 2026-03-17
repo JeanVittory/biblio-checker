@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
 from fastapi.responses import JSONResponse
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -103,6 +106,8 @@ def problem_response(
         body["instance"] = instance
     if extra:
         body["extra"] = extra
+
+    logger.warning("problem_response_sent", code=code, status=definition.status)
 
     return JSONResponse(
         status_code=definition.status,

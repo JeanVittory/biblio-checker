@@ -3,10 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
 from anyio.to_thread import run_sync
 from postgrest.exceptions import APIError
 
 from app.core.supabase_client import SupabaseClientError, get_supabase_admin_client
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -36,13 +39,29 @@ async def create_analysis_job(row: dict[str, Any]) -> dict[str, Any]:
             )
         return dict(data[0])
 
+    logger.info("analysis_job_inserting")
     try:
-        return await run_sync(_insert_sync)
-    except AnalysisJobsRepoError:
+        result = await run_sync(_insert_sync)
+        job_id = result.get("id") or result.get("job_id")
+        logger.info("analysis_job_inserted", job_id=job_id)
+        return result
+    except AnalysisJobsRepoError as exc:
+        logger.error(
+            "analysis_job_insert_failed",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
         raise
     except APIError as exc:
         code = str(exc.code or "").strip()
-        if code in ("401", "403"):
+        is_auth_err = code in ("401", "403")
+        err_code = "db_unauthorized" if is_auth_err else "analysis_job_create_failed"
+        logger.error(
+            "analysis_job_insert_failed",
+            error_code=err_code,
+            error_detail=str(exc),
+        )
+        if is_auth_err:
             raise AnalysisJobsRepoError(
                 code="db_unauthorized",
                 detail=str(exc),
@@ -51,6 +70,11 @@ async def create_analysis_job(row: dict[str, Any]) -> dict[str, Any]:
             code="analysis_job_create_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "analysis_job_insert_failed",
+            error_code="analysis_job_create_failed",
+            error_detail=str(exc),
+        )
         raise AnalysisJobsRepoError(
             code="analysis_job_create_failed", detail=str(exc) or None
         ) from exc
@@ -95,13 +119,31 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
             )
         return dict(data[0])
 
+    logger.info("analysis_job_fetching", job_id=job_id)
     try:
-        return await run_sync(_select_sync)
-    except AnalysisJobsRepoError:
+        result = await run_sync(_select_sync)
+        status = result.get("status") if result is not None else None
+        logger.info("analysis_job_fetched", job_id=job_id, status=status)
+        return result
+    except AnalysisJobsRepoError as exc:
+        logger.error(
+            "analysis_job_fetch_failed",
+            job_id=job_id,
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
         raise
     except APIError as exc:
         code = str(exc.code or "").strip()
-        if code in ("401", "403"):
+        is_auth_err = code in ("401", "403")
+        err_code = "db_unauthorized" if is_auth_err else "analysis_job_fetch_failed"
+        logger.error(
+            "analysis_job_fetch_failed",
+            job_id=job_id,
+            error_code=err_code,
+            error_detail=str(exc),
+        )
+        if is_auth_err:
             raise AnalysisJobsRepoError(
                 code="db_unauthorized",
                 detail=str(exc),
@@ -110,6 +152,12 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
             code="analysis_job_fetch_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "analysis_job_fetch_failed",
+            job_id=job_id,
+            error_code="analysis_job_fetch_failed",
+            error_detail=str(exc),
+        )
         raise AnalysisJobsRepoError(
             code="analysis_job_fetch_failed", detail=str(exc) or None
         ) from exc

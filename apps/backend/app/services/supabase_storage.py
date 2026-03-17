@@ -5,11 +5,14 @@ from dataclasses import dataclass
 from typing import Final
 
 import httpx
+import structlog
 from anyio.to_thread import run_sync
 from storage3.exceptions import StorageApiError
 
 from app.core.config import settings
 from app.core.supabase_client import SupabaseClientError, get_supabase_admin_client
+
+logger = structlog.stdlib.get_logger(__name__)
 
 _DEFAULT_TIMEOUT_SECONDS: Final[float] = 30.0
 _CHUNK_SIZE: Final[int] = 64 * 1024
@@ -25,6 +28,11 @@ async def _create_signed_download_url(*, bucket: str, path: str) -> str:
     try:
         supabase = get_supabase_admin_client()
     except SupabaseClientError as exc:
+        logger.error(
+            "storage_error",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
         raise SupabaseStorageError(code=exc.code, detail=exc.detail) from exc
 
     def _signed_url_sync() -> str:
@@ -41,35 +49,59 @@ async def _create_signed_download_url(*, bucket: str, path: str) -> str:
             )
         return str(signed)
 
+    logger.info("storage_signed_url_creating", bucket=bucket, path=path)
     try:
-        return await run_sync(_signed_url_sync)
-    except SupabaseStorageError:
+        url = await run_sync(_signed_url_sync)
+        logger.info("storage_signed_url_created")
+        return url
+    except SupabaseStorageError as exc:
+        logger.error(
+            "storage_error",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
         raise
     except StorageApiError as exc:
         status = str(exc.status)
         if status == "404":
-            raise SupabaseStorageError(
-                code="storage_not_found", detail=exc.message
-            ) from exc
-        if status in ("401", "403"):
-            raise SupabaseStorageError(
-                code="storage_unauthorized", detail=exc.message
-            ) from exc
-        raise SupabaseStorageError(
-            code="storage_download_failed",
-            detail=f"Signed URL generation failed with status {exc.status}.",
-        ) from exc
+            err = SupabaseStorageError(code="storage_not_found", detail=exc.message)
+        elif status in ("401", "403"):
+            err = SupabaseStorageError(code="storage_unauthorized", detail=exc.message)
+        else:
+            err = SupabaseStorageError(
+                code="storage_download_failed",
+                detail=f"Signed URL generation failed with status {exc.status}.",
+            )
+        logger.error(
+            "storage_error",
+            error_code=err.code,
+            error_detail=err.detail,
+        )
+        raise err from exc
     except httpx.HTTPError as exc:
-        raise SupabaseStorageError(
+        err = SupabaseStorageError(
             code="storage_download_failed", detail=str(exc) or None
-        ) from exc
+        )
+        logger.error(
+            "storage_error",
+            error_code=err.code,
+            error_detail=err.detail,
+        )
+        raise err from exc
     except Exception as exc:  # noqa: BLE001
-        raise SupabaseStorageError(
+        err = SupabaseStorageError(
             code="storage_download_failed", detail=str(exc) or None
-        ) from exc
+        )
+        logger.error(
+            "storage_error",
+            error_code=err.code,
+            error_detail=err.detail,
+        )
+        raise err from exc
 
 
 async def download_object_bytes(bucket: str, path: str) -> bytes:
+    logger.info("storage_download_starting", bucket=bucket, path=path)
     url = await _create_signed_download_url(bucket=bucket, path=path)
 
     try:
@@ -107,11 +139,26 @@ async def download_object_bytes(bucket: str, path: str) -> bytes:
                         raise SupabaseStorageError(code="file_too_large")
                     data.extend(chunk)
 
-                return bytes(data)
+                result = bytes(data)
+                logger.info("storage_download_complete", size_bytes=len(result))
+                return result
+    except SupabaseStorageError as exc:
+        logger.error(
+            "storage_error",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
+        raise
     except httpx.HTTPError as exc:
-        raise SupabaseStorageError(
+        err = SupabaseStorageError(
             code="storage_download_failed", detail=str(exc) or None
-        ) from exc
+        )
+        logger.error(
+            "storage_error",
+            error_code=err.code,
+            error_detail=err.detail,
+        )
+        raise err from exc
 
 
 def compute_object_sha256(bucket: str, path: str) -> str:

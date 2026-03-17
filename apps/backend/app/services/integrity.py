@@ -3,7 +3,11 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+import structlog
+
 from app.services.supabase_storage import compute_object_sha256
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,11 @@ def verify_sha256_bytes(*, content: bytes, sha256: str) -> None:
     provided_sha256 = sha256.lower()
 
     if computed_sha256 != provided_sha256:
+        logger.warning(
+            "sha_mismatch",
+            computed=computed_sha256[:12],
+            provided=provided_sha256[:12],
+        )
         raise IntegrityShaMismatchError(
             computed_sha256=computed_sha256,
             provided_sha256=provided_sha256,
@@ -32,6 +41,11 @@ def verify_supabase_object_sha256(*, bucket: str, path: str, sha256: str) -> Non
     provided_sha256 = sha256.lower()
 
     if computed_sha256 != provided_sha256:
+        logger.warning(
+            "sha_mismatch",
+            computed=computed_sha256[:12],
+            provided=provided_sha256[:12],
+        )
         raise IntegrityShaMismatchError(
             computed_sha256=computed_sha256,
             provided_sha256=provided_sha256,
