@@ -42,7 +42,7 @@ def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
         logger.exception("langgraph_flow_exception")
         raise StageError(
             code="langgraph_flow_failed",
-            detail=str(exc) or None,
+            detail="LangGraph analysis flow failed.",
             transient=True,
         ) from exc
 

@@ -54,7 +54,7 @@ def extract_stage(*, supabase: Client, ctx: JobContext) -> None:
         )
         raise TerminalJobError(
             code="integrity_sha_mismatch",
-            detail=f"expected={expected} actual={actual}",
+            detail="File integrity check failed.",
         )
 
     logger.info("extract_sha_verified")
