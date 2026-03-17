@@ -42,7 +42,7 @@ class AnalysisJob:
     )
 
     @classmethod
-    def from_row(cls, row: dict) -> "AnalysisJob":
+    def from_row(cls, row: dict) -> AnalysisJob:
         """Construct an AnalysisJob from a raw Supabase response dict.
 
         Extra keys not present in the model are silently ignored.  Missing

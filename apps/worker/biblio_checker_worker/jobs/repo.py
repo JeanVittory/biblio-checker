@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from postgrest.exceptions import APIError
 from supabase import Client
@@ -16,7 +16,7 @@ _ERROR_DETAIL_MAX_LEN = 200
 
 def _now_iso() -> str:
     """Return the current UTC time as an ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _sanitize_detail(detail: str | None) -> str | None:
@@ -93,13 +93,9 @@ def update_stage(
         code = str(exc.code or "").strip()
         if code in ("401", "403"):
             raise JobRepoError(code="db_unauthorized", detail=str(exc)) from exc
-        raise JobRepoError(
-            code="stage_update_failed", detail=str(exc) or None
-        ) from exc
+        raise JobRepoError(code="stage_update_failed", detail=str(exc) or None) from exc
     except Exception as exc:  # noqa: BLE001
-        raise JobRepoError(
-            code="stage_update_failed", detail=str(exc) or None
-        ) from exc
+        raise JobRepoError(code="stage_update_failed", detail=str(exc) or None) from exc
 
 
 def mark_succeeded(
@@ -222,10 +218,6 @@ def mark_failed(
         code = str(exc.code or "").strip()
         if code in ("401", "403"):
             raise JobRepoError(code="db_unauthorized", detail=str(exc)) from exc
-        raise JobRepoError(
-            code="mark_failed_failed", detail=str(exc) or None
-        ) from exc
+        raise JobRepoError(code="mark_failed_failed", detail=str(exc) or None) from exc
     except Exception as exc:  # noqa: BLE001
-        raise JobRepoError(
-            code="mark_failed_failed", detail=str(exc) or None
-        ) from exc
+        raise JobRepoError(code="mark_failed_failed", detail=str(exc) or None) from exc
