@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import structlog
 from supabase import Client
 
 from biblio_checker_worker.jobs import repo
 from biblio_checker_worker.jobs.enums import JobStage
 from biblio_checker_worker.pipeline.context import JobContext
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 def persist_stage(*, supabase: Client, ctx: JobContext) -> None:
@@ -18,6 +21,8 @@ def persist_stage(*, supabase: Client, ctx: JobContext) -> None:
     pipeline runner, which treats it as an unexpected error and handles
     requeue/failure logic accordingly.
     """
+    logger.info("persist_stage_starting")
+
     # Step 1: Advance stage (JobRepoError propagates to runner).
     repo.update_stage(
         supabase,
@@ -33,3 +38,5 @@ def persist_stage(*, supabase: Client, ctx: JobContext) -> None:
         result_json=ctx.result_json,
         token=ctx.token,
     )
+
+    logger.info("persist_stage_complete")

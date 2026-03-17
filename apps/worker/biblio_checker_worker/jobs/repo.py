@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import structlog
 from postgrest.exceptions import APIError
 from supabase import Client
 
@@ -12,6 +13,8 @@ from biblio_checker_worker.jobs.models import AnalysisJob
 # Maximum number of characters preserved from error_detail before writing to DB.
 # Truncation prevents info-disclosure of potentially sensitive exception messages.
 _ERROR_DETAIL_MAX_LEN = 200
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 def _now_iso() -> str:
@@ -45,15 +48,29 @@ def claim_one_job(
         data = getattr(resp, "data", None)
         if not isinstance(data, list) or not data:
             return None
-        return AnalysisJob.from_row(data[0])
+        job = AnalysisJob.from_row(data[0])
+        logger.info("job_claimed_rpc", job_id=str(job.id))
+        return job
     except JobRepoError:
         raise
     except APIError as exc:
         code = str(exc.code or "").strip()
+        logger.error(
+            "job_claim_rpc_failed",
+            code=code,
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         if code in ("401", "403"):
             raise JobRepoError(code="db_unauthorized", detail=str(exc)) from exc
         raise JobRepoError(code="claim_failed", detail=str(exc) or None) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "job_claim_rpc_failed",
+            code="claim_failed",
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         raise JobRepoError(code="claim_failed", detail=str(exc) or None) from exc
 
 
@@ -87,14 +104,31 @@ def update_stage(
                 code="stage_update_failed",
                 detail="No matching row — possible lease expiry or token mismatch",
             )
+        logger.info("job_stage_updated", job_id=job_id, stage=stage.value)
     except JobRepoError:
         raise
     except APIError as exc:
         code = str(exc.code or "").strip()
+        logger.error(
+            "job_stage_update_failed",
+            job_id=job_id,
+            stage=stage.value,
+            code=code,
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         if code in ("401", "403"):
             raise JobRepoError(code="db_unauthorized", detail=str(exc)) from exc
         raise JobRepoError(code="stage_update_failed", detail=str(exc) or None) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "job_stage_update_failed",
+            job_id=job_id,
+            stage=stage.value,
+            code="stage_update_failed",
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         raise JobRepoError(code="stage_update_failed", detail=str(exc) or None) from exc
 
 
@@ -135,16 +169,31 @@ def mark_succeeded(
                 code="mark_succeeded_failed",
                 detail="No matching row — possible lease expiry or token mismatch",
             )
+        logger.info("job_mark_succeeded", job_id=job_id)
     except JobRepoError:
         raise
     except APIError as exc:
         code = str(exc.code or "").strip()
+        logger.error(
+            "job_mark_succeeded_failed",
+            job_id=job_id,
+            code=code,
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         if code in ("401", "403"):
             raise JobRepoError(code="db_unauthorized", detail=str(exc)) from exc
         raise JobRepoError(
             code="mark_succeeded_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "job_mark_succeeded_failed",
+            job_id=job_id,
+            code="mark_succeeded_failed",
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         raise JobRepoError(
             code="mark_succeeded_failed", detail=str(exc) or None
         ) from exc
@@ -212,12 +261,27 @@ def mark_failed(
                 code="mark_failed_failed",
                 detail="No matching row — possible lease expiry or token mismatch",
             )
+        logger.info("job_mark_failed", job_id=job_id, requeue=requeue)
     except JobRepoError:
         raise
     except APIError as exc:
         code = str(exc.code or "").strip()
+        logger.error(
+            "job_mark_failed_failed",
+            job_id=job_id,
+            code=code,
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         if code in ("401", "403"):
             raise JobRepoError(code="db_unauthorized", detail=str(exc)) from exc
         raise JobRepoError(code="mark_failed_failed", detail=str(exc) or None) from exc
     except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "job_mark_failed_failed",
+            job_id=job_id,
+            code="mark_failed_failed",
+            error_type=type(exc).__name__,
+            detail_preview=str(exc)[:80],
+        )
         raise JobRepoError(code="mark_failed_failed", detail=str(exc) or None) from exc

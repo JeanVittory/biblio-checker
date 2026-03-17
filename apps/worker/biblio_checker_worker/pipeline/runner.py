@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import logging
-
+import structlog
 from supabase import Client
 
 from biblio_checker_worker.jobs import repo
@@ -12,7 +11,7 @@ from biblio_checker_worker.pipeline.stages.extract import extract_stage
 from biblio_checker_worker.pipeline.stages.persist import persist_stage
 from biblio_checker_worker.pipeline.stages.run_langgraph import run_langgraph_stage
 
-logger = logging.getLogger("biblio_checker_worker.pipeline")
+logger = structlog.stdlib.get_logger("biblio_checker_worker.pipeline")
 
 # Ordered list of pipeline stage callables.  Each must accept (*, supabase, ctx).
 _STAGES = [extract_stage, run_langgraph_stage, persist_stage]
@@ -34,11 +33,13 @@ def process_job(supabase: Client, job: AnalysisJob) -> None:
     - JobRepoError from mark_failed itself -> log CRITICAL, do not re-raise
                            (the lease will expire and another worker can retry).
     """
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(job_id=str(job.id))
+
     logger.info(
-        "Processing job id=%s attempt=%d/%d",
-        job.id,
-        job.attempts,
-        job.max_attempts,
+        "job_processing",
+        attempt=job.attempts,
+        max_attempts=job.max_attempts,
     )
 
     if job.job_token is None:
@@ -77,11 +78,7 @@ def process_job(supabase: Client, job: AnalysisJob) -> None:
     except Exception:
         # SECURITY: Do not write raw exception detail to the database.
         # Log the full traceback internally only.
-        logger.error(
-            "Job id=%s raised an unexpected exception",
-            job.id,
-            exc_info=True,
-        )
+        logger.exception("job_unexpected_error")
         requeue = job.attempts < job.max_attempts
         _safe_mark_failed(
             supabase=supabase,
@@ -93,7 +90,7 @@ def process_job(supabase: Client, job: AnalysisJob) -> None:
         )
         return
 
-    logger.info("Job id=%s succeeded", job.id)
+    logger.info("job_succeeded")
 
 
 def _safe_mark_failed(
@@ -113,17 +110,15 @@ def _safe_mark_failed(
     """
     if requeue:
         logger.warning(
-            "Job id=%s requeued (code=%s, attempt=%d/%d)",
-            job.id,
-            error_code,
-            job.attempts,
-            job.max_attempts,
+            "job_requeued",
+            error_code=error_code,
+            attempt=job.attempts,
+            max_attempts=job.max_attempts,
         )
     else:
         logger.error(
-            "Job id=%s failed permanently (code=%s)",
-            job.id,
-            error_code,
+            "job_failed_permanently",
+            error_code=error_code,
         )
 
     try:
@@ -137,8 +132,7 @@ def _safe_mark_failed(
         )
     except JobRepoError as exc:
         logger.critical(
-            "Job id=%s mark_failed raised (code=%s) — lease will expire",
-            job.id,
-            exc.code,
+            "mark_failed_error",
+            error_code=exc.code,
         )
         # Do not re-raise: let the lease expire naturally.

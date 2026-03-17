@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import logging
 import secrets
 import time
 
+import structlog
 from supabase import Client
 
 from biblio_checker_worker.core.config import settings
@@ -15,7 +15,7 @@ from biblio_checker_worker.supabase.client import (
     get_supabase_admin_client,
 )
 
-logger = logging.getLogger("biblio_checker_worker.polling")
+logger = structlog.stdlib.get_logger("biblio_checker_worker.polling")
 
 
 def poll_once(*, supabase: Client) -> None:
@@ -25,25 +25,27 @@ def poll_once(*, supabase: Client) -> None:
             supabase, token=token, lease_seconds=settings.job_lease_seconds
         )
     except JobRepoError as exc:
-        logger.error("Failed to claim job (code=%s): %s", exc.code, exc.detail)
+        logger.error("claim_failed", code=exc.code, detail=exc.detail)
         return
     if job is None:
-        logger.debug("No jobs available.")
+        logger.debug("no_jobs_available")
         return
     logger.info(
-        "Claimed job id=%s attempt=%d/%d", job.id, job.attempts, job.max_attempts
+        "job_claimed",
+        job_id=str(job.id),
+        attempt=job.attempts,
+        max_attempts=job.max_attempts,
     )
     process_job(supabase=supabase, job=job)
 
 
 def run_forever() -> None:
-    logger = logging.getLogger("biblio_checker_worker.polling")
     try:
         supabase = get_supabase_admin_client()
     except SupabaseClientError as exc:
         raise RuntimeError(f"Supabase misconfigured: {exc.code}") from exc
 
-    logger.info("Polling loop started.")
+    logger.info("polling_loop_started")
     while True:
         poll_once(supabase=supabase)
         time.sleep(max(1, int(settings.poll_interval_seconds)))

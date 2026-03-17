@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import structlog
 from supabase import Client, create_client
 
 from biblio_checker_worker.core.config import settings
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -18,6 +21,7 @@ def get_supabase_admin_client() -> Client:
         not (settings.supabase_url or "").strip()
         or not (settings.supabase_service_role_key or "").strip()
     ):
+        logger.error("supabase_client_misconfigured")
         raise SupabaseClientError(code="worker_misconfigured")
 
     return create_client(settings.supabase_url, settings.supabase_service_role_key)

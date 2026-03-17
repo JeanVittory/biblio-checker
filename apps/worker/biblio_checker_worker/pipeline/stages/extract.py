@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 
+import structlog
 from supabase import Client
 
 from biblio_checker_worker.jobs import repo
 from biblio_checker_worker.jobs.enums import JobStage
 from biblio_checker_worker.jobs.errors import StageError, TerminalJobError
 from biblio_checker_worker.pipeline.context import JobContext
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 def extract_stage(*, supabase: Client, ctx: JobContext) -> None:
@@ -26,6 +29,7 @@ def extract_stage(*, supabase: Client, ctx: JobContext) -> None:
         JobRepoError: Propagated from repo.update_stage; handled by the runner.
     """
     # Step 1: Download file from storage.
+    logger.info("extract_downloading", bucket=ctx.job.bucket, path=ctx.job.path)
     try:
         file_bytes: bytes = supabase.storage.from_(ctx.job.bucket).download(
             ctx.job.path
@@ -37,14 +41,23 @@ def extract_stage(*, supabase: Client, ctx: JobContext) -> None:
             transient=True,
         ) from exc
 
+    logger.info("extract_download_complete", size_bytes=len(file_bytes))
+
     # Step 2: SHA-256 integrity check.
     actual = hashlib.sha256(file_bytes).hexdigest()
     expected = ctx.job.sha256.lower()
     if actual != expected:
+        logger.warning(
+            "extract_sha_mismatch",
+            expected_prefix=expected[:12],
+            actual_prefix=actual[:12],
+        )
         raise TerminalJobError(
             code="integrity_sha_mismatch",
             detail=f"expected={expected} actual={actual}",
         )
+
+    logger.info("extract_sha_verified")
 
     # Step 3: Populate context.
     ctx.file_bytes = file_bytes
@@ -56,3 +69,5 @@ def extract_stage(*, supabase: Client, ctx: JobContext) -> None:
         stage=JobStage.EXTRACT_DONE,
         token=ctx.token,
     )
+
+    logger.info("extract_stage_done")
