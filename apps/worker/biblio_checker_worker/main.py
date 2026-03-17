@@ -1,34 +1,27 @@
 from __future__ import annotations
 
-import logging
 import time
 
+import structlog
+
 from biblio_checker_worker.core.config import settings
+from biblio_checker_worker.core.logging import setup_logging
 from biblio_checker_worker.polling.runner import run_forever
 
-
-def _configure_logging() -> None:
-    level_name = (settings.log_level or "INFO").upper().strip()
-    level = getattr(logging, level_name, logging.INFO)
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
-    )
+logger = structlog.stdlib.get_logger("biblio_checker_worker")
 
 
 def main() -> None:
-    _configure_logging()
-    logger = logging.getLogger("biblio_checker_worker")
-
+    setup_logging()
     logger.info(
-        "Worker starting (env=%s, table=%s, poll_interval=%ss)",
-        settings.environment,
-        settings.supabase_table,
-        settings.poll_interval_seconds,
+        "worker_starting",
+        environment=settings.environment,
+        table=settings.supabase_table,
+        poll_interval=settings.poll_interval_seconds,
     )
 
     try:
         run_forever()
     except KeyboardInterrupt:
-        logger.info("Worker stopped (KeyboardInterrupt).")
+        logger.info("worker_stopped")
         time.sleep(0.05)
