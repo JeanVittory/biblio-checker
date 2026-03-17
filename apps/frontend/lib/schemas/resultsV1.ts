@@ -7,6 +7,8 @@
  */
 
 import { z } from "zod";
+import logger from "@/lib/logger";
+const log = logger.child({ module: "resultsV1" });
 
 // ---------------------------------------------------------------------------
 // Leaf schemas (shared across union branches)
@@ -184,7 +186,7 @@ export type ResultsV1 = z.infer<typeof resultsV1Schema>;
 export function parseResultsV1(data: unknown): ResultsV1 | null {
   const parsed = resultsV1Schema.safeParse(data);
   if (!parsed.success) {
-    console.error("[resultsV1] Validation failed:", parsed.error.issues);
+    log.error({ issues: parsed.error.issues }, "Validation failed");
     return null;
   }
   return parsed.data;

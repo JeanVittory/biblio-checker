@@ -1,4 +1,6 @@
 import type { ResultsV1 } from "@/lib/schemas/resultsV1";
+import logger from "@/lib/logger";
+const log = logger.child({ module: "recentAnalyses" });
 
 /**
  * Persistent storage layer for recent analysis jobs.
@@ -88,9 +90,7 @@ export function readJobs(): StoredJob[] {
 
   const data = parseStorageData(raw);
   if (data === null) {
-    console.warn(
-      "[recentAnalyses] localStorage data is corrupted or has an unsupported schema version. Returning empty list."
-    );
+    log.warn("localStorage data is corrupted or has an unsupported schema version; returning empty list");
     return [];
   }
 
