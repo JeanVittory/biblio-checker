@@ -16,6 +16,8 @@ import { uploadFileService } from "@/services/uploadFile";
 import { cleanupUploadService } from "@/services/cleanupUpload";
 import { startAnalysisGatewayService } from "@/services/startAnalysisGateway";
 import { useRecentAnalysesPolling } from "@/hooks/useRecentAnalysesPolling";
+import logger from "@/lib/logger";
+const log = logger.child({ module: "home" });
 
 /**
  * Detects whether the localStorage entry for recent analyses exists but is
@@ -252,7 +254,7 @@ export default function Home() {
           : null;
 
       if (jobId === null || jobToken === null) {
-        console.warn("Upload succeeded but job tracking failed: missing jobId or jobToken");
+        log.warn("Upload succeeded but job tracking failed: missing jobId or jobToken");
       } else {
         try {
           setStorageFullError(false);
@@ -264,7 +266,7 @@ export default function Home() {
           ) {
             setStorageFullError(true);
           } else {
-            console.warn("Upload succeeded but job tracking failed:", trackingError);
+            log.warn({ err: trackingError }, "Upload succeeded but job tracking failed");
           }
         }
       }

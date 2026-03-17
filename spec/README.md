@@ -16,3 +16,4 @@ Each feature lives in `spec/<feature>/` and typically includes:
 - `spec/results-contract-v1/` — “Results Contract v1” (normative `results` / `result` JSON schema + enums + validation requirements).
 - `spec/worker-framework/` — “Worker Framework” (state machine, atomic job claiming, pipeline framework, retry and recovery).
 - `spec/audit-logging/` — “Audit Logging” (job event tracking, reference audit log, data retention cleanup).
+- `spec/structured-logging/` — “Structured Logging” (Pino for frontend, structlog for backend/worker, request correlation, JSON output).

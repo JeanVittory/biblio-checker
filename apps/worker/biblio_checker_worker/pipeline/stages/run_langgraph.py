@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import structlog
 from supabase import Client
 
 from biblio_checker_worker.jobs import repo
@@ -7,6 +8,8 @@ from biblio_checker_worker.jobs.enums import JobStage
 from biblio_checker_worker.jobs.errors import StageError
 from biblio_checker_worker.langgraph.flow import start_analysis_flow
 from biblio_checker_worker.pipeline.context import JobContext
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
@@ -22,6 +25,8 @@ def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
         StageError (transient=True): The LangGraph flow raised an exception.
         JobRepoError: Propagated from repo.update_stage; handled by the runner.
     """
+    logger.info("langgraph_stage_starting")
+
     # Step 1: Mark stage as running.
     repo.update_stage(
         supabase,
@@ -34,9 +39,10 @@ def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
     try:
         result = start_analysis_flow(job=ctx.job, file_bytes=ctx.file_bytes)
     except Exception as exc:  # noqa: BLE001
+        logger.exception("langgraph_flow_exception")
         raise StageError(
             code="langgraph_flow_failed",
-            detail=str(exc) or None,
+            detail="LangGraph analysis flow failed.",
             transient=True,
         ) from exc
 
@@ -50,3 +56,5 @@ def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
 
     # Step 4: Store result on context.
     ctx.result_json = result
+
+    logger.info("langgraph_stage_complete")

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     app_name: str = "Biblio Checker API"
     environment: str = "development"
+    log_level: str = "INFO"
+    log_format: str = "console"
     # Keep as a plain string so dotenv values like:
     #   ALLOWED_ORIGINS="http://localhost:3000"
     # don't get JSON-decoded by pydantic-settings (which would error for list[str]).

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import logging
+import structlog
 
 from biblio_checker_worker.jobs.models import AnalysisJob
 
-logger = logging.getLogger("biblio_checker_worker.langgraph")
+logger = structlog.stdlib.get_logger("biblio_checker_worker.langgraph")
 
 
 def start_analysis_flow(*, job: AnalysisJob, file_bytes: bytes) -> dict:
@@ -17,9 +17,5 @@ def start_analysis_flow(*, job: AnalysisJob, file_bytes: bytes) -> dict:
     This is a stub implementation that logs the invocation and returns an
     empty dict.  The real LangGraph graph will be wired in a later step.
     """
-    logger.info(
-        "LangGraph flow stub invoked (job_id=%s, file_bytes=%d).",
-        job.id,
-        len(file_bytes),
-    )
+    logger.info("langgraph_flow_invoked", file_bytes=len(file_bytes))
     return {}

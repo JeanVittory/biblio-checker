@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+import structlog
 from supabase import Client
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 _ERROR_DETAIL_MAX_LEN = 200
 
@@ -42,10 +42,11 @@ def insert_job_event(
         supabase.table("job_events").insert(row).execute()
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Failed to insert job event [event_type=%s, job_id=%s]: %s",
-            event_type,
-            job_id,
-            exc,
+            "job_event_insert_failed",
+            event_type=event_type,
+            job_id=job_id,
+            error_type=type(exc).__name__,
+            error_preview=str(exc)[:80],
         )
 
 
@@ -86,8 +87,9 @@ def insert_reference_audit_batch(
         supabase.table("reference_audit_log").insert(entries).execute()
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Failed to insert reference audit batch [job_id=%s, count=%d]: %s",
-            job_id,
-            len(entries),
-            exc,
+            "reference_audit_batch_insert_failed",
+            job_id=job_id,
+            count=len(entries),
+            error_type=type(exc).__name__,
+            error_preview=str(exc)[:80],
         )

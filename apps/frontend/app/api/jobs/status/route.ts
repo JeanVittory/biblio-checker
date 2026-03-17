@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { HTTP_STATUS } from "@/lib/constants";
+import logger from "@/lib/logger";
+const log = logger.child({ module: "api/jobs/status" });
 
 
 export const runtime = "nodejs";
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   try {
     env = routeEnvSchema.parse(process.env);
   } catch {
-    console.error("[jobs/status] BIBLIO_BACKEND_CHECK_URL is not configured.");
+    log.error("BIBLIO_BACKEND_CHECK_URL is not configured");
     return NextResponse.json(
       { error: "Analysis service is not configured." },
       { status: HTTP_STATUS.INTERNAL_SERVER_ERROR }

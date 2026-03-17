@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     log_level: str = "INFO"
+    log_format: str = "console"
 
     supabase_url: str = ""
     supabase_service_role_key: str = ""

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 
+import structlog
 from anyio.to_thread import run_sync
 
 from app.core.supabase_client import get_supabase_admin_client
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 _ERROR_DETAIL_MAX_LEN = 200
 
@@ -43,8 +43,9 @@ async def insert_job_event(
         await run_sync(_insert_sync)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Failed to insert job event [event_type=%s, job_id=%s]: %s",
-            event_type,
-            job_id,
-            exc,
+            "job_event_insert_failed",
+            event_type=event_type,
+            job_id=job_id,
+            error_type=type(exc).__name__,
+            error_preview=str(exc)[:80],
         )
