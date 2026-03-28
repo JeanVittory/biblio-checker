@@ -1,5 +1,9 @@
+# WARNING: This file is a copy of apps/backend/app/schemas/results.py
+# Any changes to the ResultsV1 contract MUST be applied to BOTH files
+# in the same commit. See spec/results-contract-v1/ for the normative spec.
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
@@ -223,3 +227,21 @@ class ResultsV1(BaseModel):
             raise ValueError("referenceId values must be unique within references[]")
 
         return self
+
+
+# ---------------------------------------------------------------------------
+# Internal graph models
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class MatchCandidate:
+    """Standardized result from any external API search."""
+    source: str          # "openalex" | "scielo" | "arxiv"
+    external_id: str     # Source-specific identifier
+    title: str | None
+    authors: list[str]
+    year: int | None
+    doi: str | None
+    url: str | None
+    match_type: str      # "doi_exact" | "title_fuzzy" | "identifier_exact" | "metadata_partial"
+    raw_score: float     # 0.0-1.0, source-specific similarity score

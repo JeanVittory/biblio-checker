@@ -285,3 +285,38 @@ def mark_failed(
             detail_preview=str(exc)[:80],
         )
         raise JobRepoError(code="mark_failed_failed", detail=str(exc) or None) from exc
+
+
+def renew_lease(
+    supabase: Client,
+    *,
+    job_id: str,
+    token: str,
+    lease_seconds: int,
+) -> bool:
+    """Renew the worker lease for a running job.
+
+    Returns True if the lease was renewed, False if the job was not found
+    or the token didn't match (e.g., the job was reclaimed by another worker).
+
+    Does NOT raise on failure — lease renewal failure should not crash the
+    pipeline.  Errors are logged at WARNING level.
+    """
+    try:
+        resp = supabase.rpc(
+            "renew_analysis_job_lease",
+            {"p_job_id": job_id, "p_token": token, "p_lease_secs": lease_seconds},
+        ).execute()
+        renewed: bool = bool(getattr(resp, "data", False))
+        if renewed:
+            logger.debug("lease_renewed", job_id=job_id)
+        else:
+            logger.warning("lease_renewal_failed", job_id=job_id, error="rpc returned false")
+        return renewed
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "lease_renewal_failed",
+            job_id=job_id,
+            error=str(exc)[:120],
+        )
+        return False
