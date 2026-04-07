@@ -43,7 +43,7 @@ class GraphState(TypedDict):
 
     # --- After normalize_references node ---
     normalized_references: Annotated[list[dict], operator.add]
-    # Each dict: {referenceId, rawText, normalized: {title, authors, year, venue, doi, arxivId}}
+    # Each dict: {referenceId, rawText, normalized: {title, authors, year, venue, doi, arxivId, issn, volume, issue, pages, publisher}}
 
     # --- After verify_single_reference (fan-out/fan-in) ---
     verified_references: Annotated[list[dict], operator.add]

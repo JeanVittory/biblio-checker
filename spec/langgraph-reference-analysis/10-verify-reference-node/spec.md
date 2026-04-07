@@ -40,6 +40,11 @@ def verify_single_reference(state: dict) -> dict:
             "venue": str | None,
             "doi": str | None,
             "arxivId": str | None,
+            "issn": str | None,
+            "volume": str | None,
+            "issue": str | None,
+            "pages": str | None,
+            "publisher": str | None,
         },
     },
     "warnings": [],
@@ -51,7 +56,7 @@ def verify_single_reference(state: dict) -> dict:
 
 1. Extract normalized fields from `state["reference"]["normalized"]`
 2. Create API client instances using config settings
-3. Query all 3 sources concurrently, collecting results and errors:
+3. Query all 3 sources sequentially, collecting results and errors:
 
 ```python
 candidates: list[MatchCandidate] = []
@@ -60,11 +65,16 @@ source_errors: dict[str, str] = {}
 for source_name, client in [("openalex", openalex), ("scielo", scielo), ("arxiv", arxiv)]:
     try:
         results = client.search(
-            title=normalized["title"],
-            authors=normalized["authors"],
-            year=normalized["year"],
-            doi=normalized["doi"],
-            arxiv_id=normalized["arxivId"],
+            title=normalized.get("title"),
+            authors=normalized.get("authors", []),
+            year=normalized.get("year"),
+            doi=normalized.get("doi"),
+            arxiv_id=normalized.get("arxivId"),
+            issn=normalized.get("issn"),
+            volume=normalized.get("volume"),
+            issue=normalized.get("issue"),
+            pages=normalized.get("pages"),
+            publisher=normalized.get("publisher"),
         )
         candidates.extend(results)
     except Exception as exc:
@@ -79,9 +89,9 @@ for source_name, client in [("openalex", openalex), ("scielo", scielo), ("arxiv"
 for candidate in candidates:
     if candidate.match_type not in ("doi_exact", "identifier_exact"):
         score = compute_match_score(
-            ref_title=normalized["title"],
-            ref_authors=normalized["authors"],
-            ref_year=normalized["year"],
+            ref_title=normalized.get("title"),
+            ref_authors=normalized.get("authors", []),
+            ref_year=normalized.get("year"),
             candidate_title=candidate.title,
             candidate_authors=candidate.authors,
             candidate_year=candidate.year,
@@ -205,14 +215,18 @@ finally:
 
 Logger name: `"biblio_checker_worker.langgraph.nodes.verify"`
 
-- INFO: `"verify_starting"` with `reference_id`, `has_doi`, `has_arxiv_id`, `has_title`
+- INFO: `"verify_starting"` with `reference_id`, `has_doi`, `has_arxiv_id`, `has_title`, `has_issn`
 - INFO: `"verify_complete"` with `reference_id`, `candidates_found`, `sources_failed`
 - WARNING: `"verify_source_failed"` per source that errored
 - ERROR: `"verify_reference_failed"` if entire verification fails (before returning processing_error)
 
+**Note:** `has_issn` was added alongside the ISSN-based search strategies. It reflects whether the normalized reference carries an ISSN that can be forwarded to the SciELO and OpenAlex clients.
+
 ## Acceptance Criteria
 
 - [ ] Node receives partial state from `Send()` (not full `GraphState`)
+- [ ] Input `normalized` dict contains 11 fields: `title`, `authors`, `year`, `venue`, `doi`, `arxivId`, `issn`, `volume`, `issue`, `pages`, `publisher`
+- [ ] `client.search()` is called with all 10 keyword arguments (title, authors, year, doi, arxiv_id, issn, volume, issue, pages, publisher)
 - [ ] Queries all 3 API sources for each reference
 - [ ] Computes `raw_score` using `compute_match_score()` for non-exact matches
 - [ ] Returns `{"verified_references": [dict], "warnings": list[dict]}`
@@ -221,6 +235,7 @@ Logger name: `"biblio_checker_worker.langgraph.nodes.verify"`
 - [ ] Source timeout warnings are added to the warnings list
 - [ ] Lease is renewed before API calls
 - [ ] API clients are properly closed after use
+- [ ] `"verify_starting"` log includes `has_issn`
 - [ ] Unit tests with mocked API clients cover: all sources succeed, one source fails, all sources fail, no candidates found
 
 ## Edge Cases
@@ -232,8 +247,11 @@ Logger name: `"biblio_checker_worker.langgraph.nodes.verify"`
 | Reference has no title, no DOI, no arXiv ID | Sources may return empty results. Scoring returns 0.0. Classification (Step 09) handles this as `insufficient_metadata`. |
 | OpenAlex returns 5 candidates, arXiv returns 2 | All 7 candidates are merged into the candidates list. Classification picks the best. |
 | One source returns very slowly (25+ seconds) | Timeout from `API_TIMEOUT_SECONDS` config. Source error is logged, others proceed. |
+| SciELO returns candidates with `match_type="issn_filter"` | Treated as non-exact match; `raw_score` is computed via `compute_match_score()`. |
 
 ## Dependencies
 
 - **Depends on:** Step 07 (API clients), Step 08 (scoring), Step 12 (lease renewal), Step 01 (schemas: `MatchCandidate`)
 - **Informs:** Step 09 (classify_results processes the output of this node)
+
+> **Note:** See `spec/enhanced-search-strategies/` for the full specification of the enhanced search fields (`issn`, `volume`, `issue`, `pages`, `publisher`) that are now forwarded through this node.
