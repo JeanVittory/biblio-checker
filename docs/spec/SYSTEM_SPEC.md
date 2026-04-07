@@ -256,6 +256,11 @@ Each item is an object with **required** fields:
   - `venue`: string or `null`
   - `doi`: string or `null`
   - `arxivId`: string or `null`
+  - `issn`: string or `null` (optional; ISSN of the journal, e.g., `"0034-8910"`)
+  - `volume`: string or `null` (optional; volume number)
+  - `issue`: string or `null` (optional; issue number)
+  - `pages`: string or `null` (optional; page range, e.g., `"41-72"`)
+  - `publisher`: string or `null` (optional; publisher name, for books/proceedings only)
 - `classification`: `classification` enum (closed; see below).
 - `confidenceScore`: number in `[0.0, 1.0]` or `null` (see matrix/nullability rules below).
 - `confidenceBand`: `confidenceBand` enum or `null` (see matrix/nullability rules below).

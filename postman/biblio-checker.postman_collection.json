@@ -189,6 +189,937 @@
           ]
         }
       ]
+    },
+    {
+      "name": "External API Validation",
+      "description": "Validates that the external APIs used for bibliographic reference verification respond correctly.\n\nStrategies tested:\n- OpenAlex: DOI lookup, title search, author+title search, title+author+year, ISSN+volume, title+year\n- SciELO: DOI lookup, ISSN search (identifiers → fetch by PID)\n- arXiv: ID lookup, DOI search, title search, title+author search\n\nIMPORTANT: Run arXiv requests one at a time (4s delay is built into pre-request scripts).",
+      "item": [
+        {
+          "name": "OpenAlex",
+          "item": [
+            {
+              "name": "1a) DOI Lookup",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.openalex.org/works/https://doi.org/10.1038/s41586-020-2649-2",
+                  "protocol": "https",
+                  "host": ["api", "openalex", "org"],
+                  "path": ["works", "https:", "", "doi.org", "10.1038", "s41586-020-2649-2"]
+                },
+                "description": "Looks up a single work by DOI (NumPy paper). The client uses this as Strategy 1.\n\nExpected: A single JSON object (NOT wrapped in `results`), with fields: `id`, `title`, `publication_year`, `doi`, `authorships`."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Response is a single work object (not wrapped in results)\", function () {",
+                      "  pm.expect(json).to.have.property(\"id\");",
+                      "  pm.expect(json).to.not.have.property(\"results\");",
+                      "});",
+                      "",
+                      "pm.test(\"id is an OpenAlex URL (W-prefixed ID)\", function () {",
+                      "  pm.expect(json.id).to.match(/^https:\\/\\/openalex\\.org\\/W\\d+$/);",
+                      "});",
+                      "",
+                      "pm.test(\"Has title field\", function () {",
+                      "  pm.expect(json).to.have.property(\"title\");",
+                      "  pm.expect(json.title).to.be.a(\"string\");",
+                      "  pm.expect(json.title.toLowerCase()).to.include(\"numpy\");",
+                      "});",
+                      "",
+                      "pm.test(\"Has publication_year field\", function () {",
+                      "  pm.expect(json).to.have.property(\"publication_year\");",
+                      "  pm.expect(json.publication_year).to.eql(2020);",
+                      "});",
+                      "",
+                      "pm.test(\"Has doi field with https://doi.org/ prefix\", function () {",
+                      "  pm.expect(json).to.have.property(\"doi\");",
+                      "  pm.expect(json.doi).to.match(/^https:\\/\\/doi\\.org\\//);",
+                      "});",
+                      "",
+                      "pm.test(\"Has authorships array with display_name\", function () {",
+                      "  pm.expect(json).to.have.property(\"authorships\");",
+                      "  pm.expect(json.authorships).to.be.an(\"array\").and.not.empty;",
+                      "  const first = json.authorships[0];",
+                      "  pm.expect(first).to.have.property(\"author\");",
+                      "  pm.expect(first.author).to.have.property(\"display_name\");",
+                      "  pm.expect(first.author.display_name).to.be.a(\"string\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "1b) Title Search",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.openalex.org/works?filter=title.search:Array programming with NumPy&per_page=5",
+                  "protocol": "https",
+                  "host": ["api", "openalex", "org"],
+                  "path": ["works"],
+                  "query": [
+                    {
+                      "key": "filter",
+                      "value": "title.search:Array programming with NumPy"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches works by title (Strategy 2). Returns a paginated response with a `results` array.\n\nExpected: JSON with `results` array, each entry having `id`, `title`, `authorships`, `publication_year`."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Response has results array\", function () {",
+                      "  pm.expect(json).to.have.property(\"results\");",
+                      "  pm.expect(json.results).to.be.an(\"array\");",
+                      "});",
+                      "",
+                      "pm.test(\"Results are not empty\", function () {",
+                      "  pm.expect(json.results.length).to.be.greaterThan(0);",
+                      "});",
+                      "",
+                      "pm.test(\"Each result has required fields for client parsing\", function () {",
+                      "  const work = json.results[0];",
+                      "  pm.expect(work).to.have.property(\"id\");",
+                      "  pm.expect(work.id).to.match(/^https:\\/\\/openalex\\.org\\/W\\d+$/);",
+                      "  pm.expect(work).to.have.property(\"title\");",
+                      "  pm.expect(work).to.have.property(\"publication_year\");",
+                      "  pm.expect(work).to.have.property(\"authorships\");",
+                      "  pm.expect(work.authorships).to.be.an(\"array\");",
+                      "});",
+                      "",
+                      "pm.test(\"Authorships have nested author.display_name\", function () {",
+                      "  const work = json.results[0];",
+                      "  if (work.authorships.length > 0) {",
+                      "    pm.expect(work.authorships[0]).to.have.property(\"author\");",
+                      "    pm.expect(work.authorships[0].author).to.have.property(\"display_name\");",
+                      "  }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "1c) Author + Title Search",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.openalex.org/works?filter=title.search:Array programming with NumPy,raw_author_name.search:Harris&per_page=5",
+                  "protocol": "https",
+                  "host": ["api", "openalex", "org"],
+                  "path": ["works"],
+                  "query": [
+                    {
+                      "key": "filter",
+                      "value": "title.search:Array programming with NumPy,raw_author_name.search:Harris"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches works by author + title combination (Strategy 3). Uses `raw_author_name.search` filter with the first author surname.\n\nExpected: Same shape as title search — `results` array with work objects."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Response has results array\", function () {",
+                      "  pm.expect(json).to.have.property(\"results\");",
+                      "  pm.expect(json.results).to.be.an(\"array\");",
+                      "});",
+                      "",
+                      "pm.test(\"Results are not empty\", function () {",
+                      "  pm.expect(json.results.length).to.be.greaterThan(0);",
+                      "});",
+                      "",
+                      "pm.test(\"Each result has required fields\", function () {",
+                      "  const work = json.results[0];",
+                      "  pm.expect(work).to.have.property(\"id\");",
+                      "  pm.expect(work).to.have.property(\"title\");",
+                      "  pm.expect(work).to.have.property(\"publication_year\");",
+                      "  pm.expect(work).to.have.property(\"doi\");",
+                      "  pm.expect(work).to.have.property(\"authorships\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "1d) Title + Author + Year Search",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.openalex.org/works?filter=title.search:Array programming with NumPy,raw_author_name.search:Harris,publication_year:2020&per_page=5",
+                  "protocol": "https",
+                  "host": ["api", "openalex", "org"],
+                  "path": ["works"],
+                  "query": [
+                    {
+                      "key": "filter",
+                      "value": "title.search:Array programming with NumPy,raw_author_name.search:Harris,publication_year:2020"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches works by title + author + year combination (Strategy 4). Combines title.search, raw_author_name.search, and publication_year filters.\n\nExpected: JSON with results array, first result has publication_year 2020."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Results array is not empty\", function () {",
+                      "  pm.expect(json).to.have.property(\"results\");",
+                      "  pm.expect(json.results).to.be.an(\"array\");",
+                      "  pm.expect(json.results.length).to.be.greaterThan(0);",
+                      "});",
+                      "",
+                      "pm.test(\"Each result has id, title, publication_year, authorships\", function () {",
+                      "  const work = json.results[0];",
+                      "  pm.expect(work).to.have.property(\"id\");",
+                      "  pm.expect(work).to.have.property(\"title\");",
+                      "  pm.expect(work).to.have.property(\"publication_year\");",
+                      "  pm.expect(work).to.have.property(\"authorships\");",
+                      "});",
+                      "",
+                      "pm.test(\"First result publication_year equals 2020\", function () {",
+                      "  pm.expect(json.results[0].publication_year).to.eql(2020);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "1e) ISSN + Volume Search",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.openalex.org/works?filter=primary_location.source.issn:0028-0836,biblio.volume:585&per_page=5",
+                  "protocol": "https",
+                  "host": ["api", "openalex", "org"],
+                  "path": ["works"],
+                  "query": [
+                    {
+                      "key": "filter",
+                      "value": "primary_location.source.issn:0028-0836,biblio.volume:585"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches works by ISSN + volume (Strategy 5). Uses Nature (ISSN 0028-0836), volume 585 (2020).\n\nExpected: JSON with results array, each entry having id, title, publication_year."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Results array is not empty\", function () {",
+                      "  pm.expect(json).to.have.property(\"results\");",
+                      "  pm.expect(json.results).to.be.an(\"array\");",
+                      "  pm.expect(json.results.length).to.be.greaterThan(0);",
+                      "});",
+                      "",
+                      "pm.test(\"Each result has id, title, publication_year\", function () {",
+                      "  const work = json.results[0];",
+                      "  pm.expect(work).to.have.property(\"id\");",
+                      "  pm.expect(work).to.have.property(\"title\");",
+                      "  pm.expect(work).to.have.property(\"publication_year\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "1f) Title + Year Search",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "https://api.openalex.org/works?filter=title.search:Array programming with NumPy,publication_year:2020&per_page=5",
+                  "protocol": "https",
+                  "host": ["api", "openalex", "org"],
+                  "path": ["works"],
+                  "query": [
+                    {
+                      "key": "filter",
+                      "value": "title.search:Array programming with NumPy,publication_year:2020"
+                    },
+                    {
+                      "key": "per_page",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches works by title + year combination (Strategy 6). Uses the NumPy paper (2020) as test data.\n\nExpected: JSON with results array, first result has publication_year 2020."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Results array is not empty\", function () {",
+                      "  pm.expect(json).to.have.property(\"results\");",
+                      "  pm.expect(json.results).to.be.an(\"array\");",
+                      "  pm.expect(json.results.length).to.be.greaterThan(0);",
+                      "});",
+                      "",
+                      "pm.test(\"First result publication_year equals 2020\", function () {",
+                      "  pm.expect(json.results[0].publication_year).to.eql(2020);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "SciELO",
+          "item": [
+            {
+              "name": "2a) DOI Lookup",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://articlemeta.scielo.org/api/v1/article/?doi=10.1590/S0034-89102006000400003",
+                  "protocol": "https",
+                  "host": ["articlemeta", "scielo", "org"],
+                  "path": ["api", "v1", "article", ""],
+                  "query": [
+                    {
+                      "key": "doi",
+                      "value": "10.1590/S0034-89102006000400003"
+                    }
+                  ]
+                },
+                "description": "Looks up a single article by DOI (Strategy 1). Uses a well-known Revista de Saude Publica article.\n\nExpected: JSON with `code`, `collection`, and `article` object containing ISIS fields like `v12` (title), `v10` (authors), `v65` (date), `v237` (doi), `v880` (PID).\n\nNOTE: SciELO does not index all DOIs. If this returns 404, the DOI may have been deindexed — try replacing with a DOI from an article found via the title search (2b + 2c)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Has top-level code field\", function () {",
+                      "  pm.expect(json).to.have.property(\"code\");",
+                      "  pm.expect(json.code).to.be.a(\"string\").and.not.empty;",
+                      "});",
+                      "",
+                      "pm.test(\"Has article object\", function () {",
+                      "  pm.expect(json).to.have.property(\"article\");",
+                      "  pm.expect(json.article).to.be.an(\"object\");",
+                      "});",
+                      "",
+                      "pm.test(\"Article has v12 (title) ISIS field\", function () {",
+                      "  pm.expect(json.article).to.have.property(\"v12\");",
+                      "  pm.expect(json.article.v12).to.be.an(\"array\").and.not.empty;",
+                      "  pm.expect(json.article.v12[0]).to.have.property(\"_\");",
+                      "});",
+                      "",
+                      "pm.test(\"Article has v10 (authors) ISIS field\", function () {",
+                      "  pm.expect(json.article).to.have.property(\"v10\");",
+                      "  pm.expect(json.article.v10).to.be.an(\"array\").and.not.empty;",
+                      "  const author = json.article.v10[0];",
+                      "  // Authors have 's' (surname) and/or 'n' (given name)",
+                      "  pm.expect(author).to.satisfy(a => a.hasOwnProperty('s') || a.hasOwnProperty('n'));",
+                      "});",
+                      "",
+                      "pm.test(\"Article has v65 (date) ISIS field\", function () {",
+                      "  pm.expect(json.article).to.have.property(\"v65\");",
+                      "  pm.expect(json.article.v65).to.be.an(\"array\").and.not.empty;",
+                      "  pm.expect(json.article.v65[0]).to.have.property(\"_\");",
+                      "  // First 4 chars should be a year",
+                      "  const dateStr = json.article.v65[0]._;",
+                      "  pm.expect(dateStr.substring(0, 4)).to.match(/^\\d{4}$/);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2b) ISSN Search (identifiers)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://articlemeta.scielo.org/api/v1/article/identifiers/?issn=0034-8910&limit=3",
+                  "protocol": "https",
+                  "host": ["articlemeta", "scielo", "org"],
+                  "path": ["api", "v1", "article", "identifiers", ""],
+                  "query": [
+                    {
+                      "key": "issn",
+                      "value": "0034-8910"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "3"
+                    }
+                  ]
+                },
+                "description": "Fetches article identifiers filtered by ISSN (Strategy 2, step 1). Uses ISSN 0034-8910 (Revista de Saude Publica) to confirm ISSN filtering is active and returns a bounded result set.\n\nExpected: JSON with `meta.filter.issn` confirming the filter, `meta.total` > 0 and < 1,400,000, and `objects` array with entries having `code` (PID) and `collection`.\n\nSave first PID to env vars for use in 2c."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"meta.filter.issn exists\", function () {",
+                      "  pm.expect(json).to.have.property(\"meta\");",
+                      "  pm.expect(json.meta).to.have.property(\"filter\");",
+                      "  pm.expect(json.meta.filter).to.have.property(\"issn\");",
+                      "});",
+                      "",
+                      "pm.test(\"objects array has items\", function () {",
+                      "  pm.expect(json).to.have.property(\"objects\");",
+                      "  pm.expect(json.objects).to.be.an(\"array\");",
+                      "  pm.expect(json.objects.length).to.be.greaterThan(0);",
+                      "});",
+                      "",
+                      "pm.test(\"Each object has code and collection\", function () {",
+                      "  const obj = json.objects[0];",
+                      "  pm.expect(obj).to.have.property(\"code\");",
+                      "  pm.expect(obj.code).to.be.a(\"string\").and.not.empty;",
+                      "  pm.expect(obj).to.have.property(\"collection\");",
+                      "  pm.expect(obj.collection).to.be.a(\"string\").and.not.empty;",
+                      "});",
+                      "",
+                      "// Save first PID for the next request (2c - Fetch by PID)",
+                      "if (json.objects && json.objects.length > 0) {",
+                      "  pm.environment.set(\"scielo_test_pid\", json.objects[0].code);",
+                      "  pm.environment.set(\"scielo_test_collection\", json.objects[0].collection);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "2c) Fetch Article by PID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://articlemeta.scielo.org/api/v1/article/?code={{scielo_test_pid}}&collection={{scielo_test_collection}}",
+                  "protocol": "https",
+                  "host": ["articlemeta", "scielo", "org"],
+                  "path": ["api", "v1", "article", ""],
+                  "query": [
+                    {
+                      "key": "code",
+                      "value": "{{scielo_test_pid}}"
+                    },
+                    {
+                      "key": "collection",
+                      "value": "{{scielo_test_collection}}"
+                    }
+                  ]
+                },
+                "description": "Fetches full article metadata by PID (Strategy 2, step 2). This is the second call the client makes after getting PIDs from the identifiers endpoint.\n\nRun AFTER 2b — uses `scielo_test_pid` and `scielo_test_collection` env vars set by the previous request.\n\nExpected: JSON with `code`, `article` object containing ISIS fields (v12, v10, v65, etc.)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "const json = pm.response.json();",
+                      "",
+                      "pm.test(\"Has top-level code field\", function () {",
+                      "  pm.expect(json).to.have.property(\"code\");",
+                      "  pm.expect(json.code).to.be.a(\"string\").and.not.empty;",
+                      "});",
+                      "",
+                      "pm.test(\"Has article object\", function () {",
+                      "  pm.expect(json).to.have.property(\"article\");",
+                      "  pm.expect(json.article).to.be.an(\"object\");",
+                      "});",
+                      "",
+                      "pm.test(\"Article has v12 (title) ISIS field\", function () {",
+                      "  pm.expect(json.article).to.have.property(\"v12\");",
+                      "  pm.expect(json.article.v12).to.be.an(\"array\").and.not.empty;",
+                      "  pm.expect(json.article.v12[0]).to.have.property(\"_\");",
+                      "});",
+                      "",
+                      "pm.test(\"Article has v10 (authors) ISIS field\", function () {",
+                      "  pm.expect(json.article).to.have.property(\"v10\");",
+                      "  pm.expect(json.article.v10).to.be.an(\"array\").and.not.empty;",
+                      "});",
+                      "",
+                      "pm.test(\"Article has v65 (date) ISIS field\", function () {",
+                      "  pm.expect(json.article).to.have.property(\"v65\");",
+                      "  pm.expect(json.article.v65).to.be.an(\"array\").and.not.empty;",
+                      "  pm.expect(json.article.v65[0]).to.have.property(\"_\");",
+                      "});",
+                      "",
+                      "// Cleanup env vars",
+                      "pm.environment.unset(\"scielo_test_pid\");",
+                      "pm.environment.unset(\"scielo_test_collection\");"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "arXiv",
+          "description": "arXiv enforces strict rate limits (max 1 request per 3 seconds). Run these requests ONE AT A TIME manually, or use the collection runner with a 4-second delay between requests.",
+          "item": [
+            {
+              "name": "3a) arXiv ID Lookup",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://export.arxiv.org/api/query?id_list=2301.08745",
+                  "protocol": "https",
+                  "host": ["export", "arxiv", "org"],
+                  "path": ["api", "query"],
+                  "query": [
+                    {
+                      "key": "id_list",
+                      "value": "2301.08745"
+                    }
+                  ]
+                },
+                "description": "Looks up a paper by arXiv ID (Strategy 1). Returns an Atom XML feed with a single entry.\n\nIMPORTANT: Wait at least 3 seconds before running the next arXiv request to avoid HTTP 429.\n\nExpected: XML response with <entry> containing <id>, <title>, <author><name>, <published>."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// arXiv rate limit: wait 4 seconds if a previous arXiv request was made",
+                      "const lastArxivRequest = pm.environment.get('last_arxiv_request_time');",
+                      "if (lastArxivRequest) {",
+                      "  const elapsed = Date.now() - parseInt(lastArxivRequest, 10);",
+                      "  if (elapsed < 4000) {",
+                      "    const waitMs = 4000 - elapsed;",
+                      "    // Postman doesn't have native sleep, so we use a setTimeout workaround",
+                      "    const start = Date.now();",
+                      "    while (Date.now() - start < waitMs) { /* busy wait */ }",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.environment.set('last_arxiv_request_time', Date.now().toString());",
+                      "",
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"Response is XML\", function () {",
+                      "  const ct = pm.response.headers.get(\"Content-Type\") || \"\";",
+                      "  pm.expect(ct).to.include(\"xml\");",
+                      "});",
+                      "",
+                      "const xml = pm.response.text();",
+                      "",
+                      "pm.test(\"Contains <entry> element\", function () {",
+                      "  pm.expect(xml).to.include(\"<entry>\");",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <id> with arxiv.org URL\", function () {",
+                      "  pm.expect(xml).to.match(/<id>http:\\/\\/arxiv\\.org\\/abs\\/[\\d.]+/);",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <title>\", function () {",
+                      "  pm.expect(xml).to.match(/<title>[^<]+<\\/title>/);",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <author><name>\", function () {",
+                      "  pm.expect(xml).to.include(\"<author>\");",
+                      "  pm.expect(xml).to.include(\"<name>\");",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <published> with ISO date\", function () {",
+                      "  pm.expect(xml).to.match(/<published>\\d{4}-\\d{2}-\\d{2}/);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3b) DOI Search",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://export.arxiv.org/api/query?search_query=doi:10.48550/arXiv.2301.08745&max_results=1",
+                  "protocol": "https",
+                  "host": ["export", "arxiv", "org"],
+                  "path": ["api", "query"],
+                  "query": [
+                    {
+                      "key": "search_query",
+                      "value": "doi:10.48550/arXiv.2301.08745"
+                    },
+                    {
+                      "key": "max_results",
+                      "value": "1"
+                    }
+                  ]
+                },
+                "description": "Searches for a paper by DOI (Strategy 2). Returns an Atom XML feed.\n\nIMPORTANT: Wait at least 3 seconds after the previous arXiv request.\n\nExpected: XML response. May or may not contain <entry> depending on whether the DOI is indexed — the test validates the response structure is valid."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// arXiv rate limit: wait 4 seconds since last request",
+                      "const lastArxivRequest = pm.environment.get('last_arxiv_request_time');",
+                      "if (lastArxivRequest) {",
+                      "  const elapsed = Date.now() - parseInt(lastArxivRequest, 10);",
+                      "  if (elapsed < 4000) {",
+                      "    const waitMs = 4000 - elapsed;",
+                      "    const start = Date.now();",
+                      "    while (Date.now() - start < waitMs) { /* busy wait */ }",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.environment.set('last_arxiv_request_time', Date.now().toString());",
+                      "",
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"Response is XML\", function () {",
+                      "  const ct = pm.response.headers.get(\"Content-Type\") || \"\";",
+                      "  pm.expect(ct).to.include(\"xml\");",
+                      "});",
+                      "",
+                      "const xml = pm.response.text();",
+                      "",
+                      "pm.test(\"Response is a valid Atom feed\", function () {",
+                      "  pm.expect(xml).to.include(\"<feed\");",
+                      "  pm.expect(xml).to.include(\"http://www.w3.org/2005/Atom\");",
+                      "});",
+                      "",
+                      "pm.test(\"If entries exist, they have correct structure\", function () {",
+                      "  if (xml.includes(\"<entry>\")) {",
+                      "    pm.expect(xml).to.match(/<id>http:\\/\\/arxiv\\.org\\/abs\\//);",
+                      "    pm.expect(xml).to.include(\"<title>\");",
+                      "    pm.expect(xml).to.include(\"<author>\");",
+                      "  }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3c) Title Search",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://export.arxiv.org/api/query?search_query=ti:\"Attention Is All You Need\"&max_results=5",
+                  "protocol": "https",
+                  "host": ["export", "arxiv", "org"],
+                  "path": ["api", "query"],
+                  "query": [
+                    {
+                      "key": "search_query",
+                      "value": "ti:\"Attention Is All You Need\""
+                    },
+                    {
+                      "key": "max_results",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches for papers by title (Strategy 3). Uses the iconic Transformer paper as test data.\n\nIMPORTANT: Wait at least 3 seconds after the previous arXiv request.\n\nExpected: XML Atom feed with multiple <entry> elements."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// arXiv rate limit: wait 4 seconds since last request",
+                      "const lastArxivRequest = pm.environment.get('last_arxiv_request_time');",
+                      "if (lastArxivRequest) {",
+                      "  const elapsed = Date.now() - parseInt(lastArxivRequest, 10);",
+                      "  if (elapsed < 4000) {",
+                      "    const waitMs = 4000 - elapsed;",
+                      "    const start = Date.now();",
+                      "    while (Date.now() - start < waitMs) { /* busy wait */ }",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.environment.set('last_arxiv_request_time', Date.now().toString());",
+                      "",
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"Response is XML\", function () {",
+                      "  const ct = pm.response.headers.get(\"Content-Type\") || \"\";",
+                      "  pm.expect(ct).to.include(\"xml\");",
+                      "});",
+                      "",
+                      "const xml = pm.response.text();",
+                      "",
+                      "pm.test(\"Contains at least one <entry>\", function () {",
+                      "  pm.expect(xml).to.include(\"<entry>\");",
+                      "});",
+                      "",
+                      "pm.test(\"Entries have <id> with arxiv.org URL\", function () {",
+                      "  pm.expect(xml).to.match(/<id>http:\\/\\/arxiv\\.org\\/abs\\/[\\d.]+/);",
+                      "});",
+                      "",
+                      "pm.test(\"Entries have <title>\", function () {",
+                      "  pm.expect(xml).to.match(/<title>[^<]+<\\/title>/);",
+                      "});",
+                      "",
+                      "pm.test(\"Entries have <author><name>\", function () {",
+                      "  pm.expect(xml).to.include(\"<author>\");",
+                      "  pm.expect(xml).to.include(\"<name>\");",
+                      "});",
+                      "",
+                      "pm.test(\"Entries have <published> date\", function () {",
+                      "  pm.expect(xml).to.match(/<published>\\d{4}-\\d{2}-\\d{2}/);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "3d) Title + Author Search",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://export.arxiv.org/api/query?search_query=ti:\"Attention Is All You Need\"+AND+au:Vaswani&max_results=5",
+                  "protocol": "https",
+                  "host": ["export", "arxiv", "org"],
+                  "path": ["api", "query"],
+                  "query": [
+                    {
+                      "key": "search_query",
+                      "value": "ti:\"Attention Is All You Need\"+AND+au:Vaswani"
+                    },
+                    {
+                      "key": "max_results",
+                      "value": "5"
+                    }
+                  ]
+                },
+                "description": "Searches for papers by title + author combination (Strategy 4). Uses the Transformer paper as test data.\n\nIMPORTANT: Wait at least 3 seconds after the previous arXiv request. Pre-request script enforces a 4-second busy-wait.\n\nExpected: XML Atom feed with <entry> elements containing <id>, <title>, <author><name>, <published>."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// arXiv rate limit: wait 4 seconds since last request",
+                      "const lastArxivRequest = pm.environment.get('last_arxiv_request_time');",
+                      "if (lastArxivRequest) {",
+                      "  const elapsed = Date.now() - parseInt(lastArxivRequest, 10);",
+                      "  if (elapsed < 4000) {",
+                      "    const waitMs = 4000 - elapsed;",
+                      "    const start = Date.now();",
+                      "    while (Date.now() - start < waitMs) { /* busy wait */ }",
+                      "  }",
+                      "}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.environment.set('last_arxiv_request_time', Date.now().toString());",
+                      "",
+                      "pm.test(\"HTTP 200\", function () {",
+                      "  pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"Response is XML\", function () {",
+                      "  const ct = pm.response.headers.get(\"Content-Type\") || \"\";",
+                      "  pm.expect(ct).to.include(\"xml\");",
+                      "});",
+                      "",
+                      "const xml = pm.response.text();",
+                      "",
+                      "pm.test(\"Contains <entry> element\", function () {",
+                      "  pm.expect(xml).to.include(\"<entry>\");",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <id>\", function () {",
+                      "  pm.expect(xml).to.match(/<id>http:\\/\\/arxiv\\.org\\/abs\\/[\\d.]+/);",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <title>\", function () {",
+                      "  pm.expect(xml).to.match(/<title>[^<]+<\\/title>/);",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <author><name>\", function () {",
+                      "  pm.expect(xml).to.include(\"<author>\");",
+                      "  pm.expect(xml).to.include(\"<name>\");",
+                      "});",
+                      "",
+                      "pm.test(\"Entry has <published>\", function () {",
+                      "  pm.expect(xml).to.match(/<published>\\d{4}-\\d{2}-\\d{2}/);",
+                      "});",
+                      "",
+                      "// Cleanup",
+                      "pm.environment.unset('last_arxiv_request_time');"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "protocolProfileBehavior": {

@@ -11,7 +11,7 @@
 
 ## Context
 
-Each raw reference from the previous node is a free-form text string in an unknown citation style (APA, Vancouver, Chicago, IEEE, Harvard, or others). This node uses an LLM to extract 6 structured fields from each reference:
+Each raw reference from the previous node is a free-form text string in an unknown citation style (APA, Vancouver, Chicago, IEEE, Harvard, or others). This node uses an LLM to extract 11 structured fields from each reference:
 
 - `title` — Title of the work
 - `authors` — List of author names
@@ -19,6 +19,11 @@ Each raw reference from the previous node is a free-form text string in an unkno
 - `venue` — Journal, conference, publisher, or other venue
 - `doi` — Digital Object Identifier (if present)
 - `arxivId` — arXiv identifier (if present)
+- `issn` — ISSN of the journal (if explicitly present in the reference text)
+- `volume` — Volume number of the journal or series
+- `issue` — Issue or number within the volume
+- `pages` — Page range or article number
+- `publisher` — Publisher name (for books and proceedings only)
 
 These fields are defined by the `NormalizedReference` model in the ResultsV1 contract (`apps/backend/app/schemas/results.py:64-72`).
 
@@ -29,7 +34,7 @@ These fields are defined by the `NormalizedReference` model in the ResultsV1 con
 **File:** `apps/worker/biblio_checker_worker/langgraph/prompts/normalize.py`
 
 ```python
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NormalizedFields(BaseModel):
@@ -59,6 +64,28 @@ class NormalizedFields(BaseModel):
         alias="arxivId",
         description="arXiv identifier, e.g., '2301.12345' or 'hep-ph/9901234'. Null if not present.",
     )
+    issn: str | None = Field(
+        None,
+        description="ISSN (International Standard Serial Number) of the journal. Format: '1234-5678'. Null if not present in the reference text.",
+    )
+    volume: str | None = Field(
+        None,
+        description="Volume number of the journal or series. E.g., '26', '12'. Null if not applicable (books without volume).",
+    )
+    issue: str | None = Field(
+        None,
+        description="Issue or number within the volume. E.g., '3', '105-106'. Null if not present.",
+    )
+    pages: str | None = Field(
+        None,
+        description="Page range or article number. E.g., '41-72', 'e12345'. Null if not present.",
+    )
+    publisher: str | None = Field(
+        None,
+        description="Publisher name for books or proceedings. E.g., 'Cambridge University Press'. Null if not applicable (journal articles).",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class NormalizedReferenceEntry(BaseModel):
@@ -80,7 +107,7 @@ class NormalizeReferencesOutput(BaseModel):
 Define in the same file (`prompts/normalize.py`):
 
 ```python
-NORMALIZE_SYSTEM_PROMPT = """You are a bibliographic metadata extractor. You receive a list of bibliographic references in any citation style (APA, Vancouver, Chicago, IEEE, Harvard, or any other format).
+NORMALIZE_SYSTEM_PROMPT = """You are a bibliographic metadata extractor. You receive a list of bibliographic references in any citation style (APA, MLA, Vancouver, Chicago, IEEE, Harvard, or any other format).
 
 For each reference, extract the following fields:
 - title: The title of the work (article, book, chapter, etc.)
@@ -89,6 +116,11 @@ For each reference, extract the following fields:
 - venue: The journal, conference, publisher, or other publication venue
 - doi: The DOI (Digital Object Identifier) without 'https://doi.org/' prefix
 - arxivId: The arXiv identifier (e.g., '2301.12345')
+- issn: The ISSN of the journal (e.g., '0034-8910'). Only extract if explicitly written in the reference
+- volume: The volume number of the journal (e.g., '26', '12')
+- issue: The issue or number within the volume (e.g., '3', '105-106')
+- pages: The page range or article number (e.g., '41-72', 'pp. 45-60' → '45-60')
+- publisher: The publisher name (for books/proceedings, not for journal articles)
 
 Rules:
 - Extract fields regardless of citation style — the format does not matter
@@ -97,6 +129,10 @@ Rules:
 - For arXiv, extract just the ID (e.g., '2301.12345'), not the full URL
 - For authors, preserve the format as it appears (e.g., 'Smith, J.' or 'John Smith')
 - For year, extract only the publication year, not access dates or retrieval dates
+- For pages, normalize to just the range (remove 'pp.', 'p.', etc.)
+- For volume and issue, extract just the number (remove 'vol.', 'n.º', 'no.', etc.)
+- For ISSN, only extract if the ISSN number is explicitly written in the reference text. Do NOT infer or look up ISSNs
+- For publisher, extract only for books and proceedings. For journal articles, leave null (the journal name goes in venue)
 - Process ALL references in the input — do not skip any
 - Return each reference with its corresponding index from the input list
 
@@ -133,26 +169,38 @@ def normalize_references(state: GraphState) -> dict:
 5. Create structured LLM: `structured_llm = llm.with_structured_output(NormalizeReferencesOutput)`
 6. Build messages with `NORMALIZE_SYSTEM_PROMPT` and `NORMALIZE_USER_PROMPT.format(count=len(raw_references), references_text=references_text)`
 7. Invoke: `result = structured_llm.invoke(messages)`
-8. Transform to graph format, assigning `referenceId`:
+8. Transform to graph format, assigning `referenceId`. Apply identifier validation (DOI, arXiv ID, ISSN) before building each entry:
    ```python
    normalized = []
    for entry in result.references:
        ref_index = entry.index
        raw_ref = raw_references[ref_index] if ref_index < len(raw_references) else None
+       reference_id = f"ref-{ref_index + 1:03d}"
+
+       valid_doi, doi_warning = _validate_doi(entry.normalized.doi)
+       valid_arxiv, arxiv_warning = _validate_arxiv_id(entry.normalized.arxiv_id)
+       valid_issn, issn_warning = _validate_issn(entry.normalized.issn)
+       # attach referenceId to each warning and collect them
+
        normalized.append({
-           "referenceId": f"ref-{ref_index + 1:03d}",
+           "referenceId": reference_id,
            "rawText": raw_ref["rawText"] if raw_ref else "",
            "normalized": {
                "title": entry.normalized.title,
                "authors": entry.normalized.authors,
                "year": entry.normalized.year,
                "venue": entry.normalized.venue,
-               "doi": entry.normalized.doi,
-               "arxivId": entry.normalized.arxiv_id,
+               "doi": valid_doi,
+               "arxivId": valid_arxiv,
+               "issn": valid_issn,
+               "volume": entry.normalized.volume,
+               "issue": entry.normalized.issue,
+               "pages": entry.normalized.pages,
+               "publisher": entry.normalized.publisher,
            },
        })
    ```
-9. Return `{"normalized_references": normalized}`
+9. Return `{"normalized_references": normalized}` (and `"warnings"` if any were produced)
 
 ### 4. Batching Strategy
 
@@ -187,6 +235,16 @@ After the LLM returns normalized references, validate the format of extracted id
   {"code": "invalid_arxiv_id_format", "message": f"arXiv ID '{arxiv_id}' does not match expected format and was discarded.", "referenceId": reference_id, "details": None}
   ```
 
+**ISSN format validation:**
+- Valid pattern: `^\d{4}-\d{3}[\dXx]$`
+- If the extracted `issn` does not match this pattern, set it to `None` and add a warning:
+  ```python
+  {"code": "invalid_issn_format", "message": f"ISSN '{issn}' does not match expected format and was discarded.", "referenceId": reference_id, "details": None}
+  ```
+- If valid, normalize the check digit to uppercase: a lowercase `x` is uppercased to `X` (e.g., `"1234-567x"` → `"1234-567X"`).
+
+**Fields not validated:** `volume`, `issue`, `pages`, and `publisher` are passed through as-is from the LLM output without format validation.
+
 These warnings are included in the return value under the `warnings` key.
 
 ### 7. Logging
@@ -201,14 +259,18 @@ Logger name: `"biblio_checker_worker.langgraph.nodes.normalize"`
 
 - [ ] Node function has signature `normalize_references(state: GraphState) -> dict`
 - [ ] Returns `{"normalized_references": list[dict]}`
-- [ ] Each dict has keys: `referenceId` (str, format `"ref-001"`), `rawText` (str), `normalized` (dict with 6 fields)
-- [ ] `normalized` dict contains: `title`, `authors`, `year`, `venue`, `doi`, `arxivId`
+- [ ] Each dict has keys: `referenceId` (str, format `"ref-001"`), `rawText` (str), `normalized` (dict with 11 fields)
+- [ ] `normalized` dict contains: `title`, `authors`, `year`, `venue`, `doi`, `arxivId`, `issn`, `volume`, `issue`, `pages`, `publisher`
 - [ ] Uses `with_structured_output(NormalizeReferencesOutput)` for structured output
 - [ ] Prompt is style-agnostic — works with APA, Vancouver, Chicago, IEEE, Harvard
 - [ ] All references are sent in a single LLM call (batched)
 - [ ] Handles empty `raw_references` gracefully (returns empty list)
 - [ ] Count mismatches between input and LLM output produce a warning
 - [ ] `referenceId` is assigned as `ref-001`, `ref-002`, etc. (1-based, zero-padded to 3 digits)
+- [ ] Malformed DOI produces `invalid_doi_format` warning and is set to `None`
+- [ ] Malformed arXiv ID produces `invalid_arxiv_id_format` warning and is set to `None`
+- [ ] Malformed ISSN produces `invalid_issn_format` warning and is set to `None`
+- [ ] Valid ISSN with lowercase check digit `x` is normalized to uppercase `X`
 - [ ] Unit tests with mocked LLM cover: normal normalization, empty input, count mismatch
 
 ## Edge Cases
@@ -219,10 +281,17 @@ Logger name: `"biblio_checker_worker.langgraph.nodes.normalize"`
 | Reference with no DOI or arXiv ID | `doi: null`, `arxivId: null` |
 | Reference with DOI as full URL (`https://doi.org/10.1234/...`) | LLM extracts just `10.1234/...` |
 | Reference in a non-Latin script (e.g., Chinese, Arabic) | LLM should still extract fields; title/authors preserved in original script |
-| Reference to a book (no journal/volume) | `venue` is the publisher name |
+| Reference to a book (no journal/volume) | `venue` is the publisher name; `publisher` may also be populated |
 | Reference with multiple years (publication + reprint) | LLM should extract the primary publication year |
+| ISSN not present in the reference text | `issn: null` — the LLM must not infer or look up ISSNs |
+| Volume expressed as a roman numeral (e.g., `Vol. XIV`) | LLM extracts as-is (e.g., `"XIV"`); no further normalization applied |
+| Double issue (e.g., `105-106`) | LLM extracts `"105-106"` as the `issue` value |
+| Pages given as an article number (e.g., `e12345`) | LLM extracts the article number as-is into `pages` |
+| Publisher for a book reference | `publisher` is populated; `venue` may also hold the publisher name |
 
 ## Dependencies
 
 - **Depends on:** Step 02 (GraphState), Step 04 (LLM client factory), Step 05 (parse_references provides `raw_references`)
 - **Informs:** Step 10 (verify_single_reference receives normalized references via fan-out)
+
+> **Note:** See `spec/enhanced-search-strategies/` for the full specification of the enhanced field set that motivated the addition of `issn`, `volume`, `issue`, `pages`, and `publisher`.

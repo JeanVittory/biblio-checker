@@ -71,6 +71,11 @@ def verify_single_reference(state: dict) -> dict:
                     "venue": str | None,
                     "doi": str | None,
                     "arxivId": str | None,
+                    "issn": str | None,
+                    "volume": str | None,
+                    "issue": str | None,
+                    "pages": str | None,
+                    "publisher": str | None,
                 },
             },
             "warnings": [],
@@ -93,6 +98,7 @@ def verify_single_reference(state: dict) -> dict:
         has_doi=normalized.get("doi") is not None,
         has_arxiv_id=normalized.get("arxivId") is not None,
         has_title=normalized.get("title") is not None,
+        has_issn=normalized.get("issn") is not None,
     )
 
     settings = get_settings()
@@ -122,6 +128,11 @@ def verify_single_reference(state: dict) -> dict:
                     year=normalized.get("year"),
                     doi=normalized.get("doi"),
                     arxiv_id=normalized.get("arxivId"),
+                    issn=normalized.get("issn"),
+                    volume=normalized.get("volume"),
+                    issue=normalized.get("issue"),
+                    pages=normalized.get("pages"),
+                    publisher=normalized.get("publisher"),
                 )
                 candidates.extend(results)
             except Exception as exc:

@@ -21,6 +21,11 @@ const normalizedReferenceSchema = z.object({
   venue: z.string().nullable(),
   doi: z.string().nullable(),
   arxivId: z.string().nullable(),
+  issn: z.string().nullable().optional(),
+  volume: z.string().nullable().optional(),
+  issue: z.string().nullable().optional(),
+  pages: z.string().nullable().optional(),
+  publisher: z.string().nullable().optional(),
 });
 
 const matchedRecordSchema = z.object({
@@ -49,6 +54,7 @@ const reasonCodeSchema = z.enum([
   "cross_source_metadata_conflict",
   "source_timeout_partial",
   "reference_processing_failure",
+  "single_moderate_match",
 ]);
 
 // ---------------------------------------------------------------------------
