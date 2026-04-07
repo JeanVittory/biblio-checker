@@ -52,6 +52,11 @@ def _make_state(
     year: int | None = 2020,
     doi: str | None = None,
     arxiv_id: str | None = None,
+    issn: str | None = "0034-8910",
+    volume: str | None = "26",
+    issue: str | None = "3",
+    pages: str | None = "41-72",
+    publisher: str | None = None,
 ) -> dict:
     return {
         "job_id": "job-uuid-001",
@@ -65,6 +70,11 @@ def _make_state(
                 "venue": None,
                 "doi": doi,
                 "arxivId": arxiv_id,
+                "issn": issn,
+                "volume": volume,
+                "issue": issue,
+                "pages": pages,
+                "publisher": publisher,
             },
         },
         "warnings": [],
@@ -500,6 +510,96 @@ class TestAllSourcesFail:
         assert any(
             w["code"] == "reference_verification_failed" for w in result["warnings"]
         )
+
+
+# ---------------------------------------------------------------------------
+# Test: new fields forwarded to client.search()
+# ---------------------------------------------------------------------------
+
+class TestNewFieldsForwarded:
+    def test_issn_volume_issue_pages_publisher_passed_to_search(self) -> None:
+        """All five new normalized fields must be forwarded via client.search() kwargs."""
+        mock_openalex = MagicMock()
+        mock_openalex.search.return_value = []
+        mock_scielo = MagicMock()
+        mock_scielo.search.return_value = []
+        mock_arxiv = MagicMock()
+        mock_arxiv.search.return_value = []
+
+        state = _make_state(
+            issn="0034-8910",
+            volume="26",
+            issue="3",
+            pages="41-72",
+            publisher="Elsevier",
+        )
+
+        with (
+            patch(
+                "biblio_checker_worker.langgraph.nodes.verify.OpenAlexClient",
+                return_value=mock_openalex,
+            ),
+            patch(
+                "biblio_checker_worker.langgraph.nodes.verify.ScieloClient",
+                return_value=mock_scielo,
+            ),
+            patch(
+                "biblio_checker_worker.langgraph.nodes.verify.ArxivClient",
+                return_value=mock_arxiv,
+            ),
+        ):
+            from biblio_checker_worker.langgraph.nodes.verify import (
+                verify_single_reference,
+            )
+
+            verify_single_reference(state)
+
+        for mock_client in (mock_openalex, mock_scielo, mock_arxiv):
+            _, kwargs = mock_client.search.call_args
+            assert kwargs["issn"] == "0034-8910"
+            assert kwargs["volume"] == "26"
+            assert kwargs["issue"] == "3"
+            assert kwargs["pages"] == "41-72"
+            assert kwargs["publisher"] == "Elsevier"
+
+    def test_none_new_fields_forwarded_as_none(self) -> None:
+        """When new fields are absent from normalized, None is forwarded to search()."""
+        mock_openalex = MagicMock()
+        mock_openalex.search.return_value = []
+        mock_scielo = MagicMock()
+        mock_scielo.search.return_value = []
+        mock_arxiv = MagicMock()
+        mock_arxiv.search.return_value = []
+
+        state = _make_state(issn=None, volume=None, issue=None, pages=None, publisher=None)
+
+        with (
+            patch(
+                "biblio_checker_worker.langgraph.nodes.verify.OpenAlexClient",
+                return_value=mock_openalex,
+            ),
+            patch(
+                "biblio_checker_worker.langgraph.nodes.verify.ScieloClient",
+                return_value=mock_scielo,
+            ),
+            patch(
+                "biblio_checker_worker.langgraph.nodes.verify.ArxivClient",
+                return_value=mock_arxiv,
+            ),
+        ):
+            from biblio_checker_worker.langgraph.nodes.verify import (
+                verify_single_reference,
+            )
+
+            verify_single_reference(state)
+
+        for mock_client in (mock_openalex, mock_scielo, mock_arxiv):
+            _, kwargs = mock_client.search.call_args
+            assert kwargs["issn"] is None
+            assert kwargs["volume"] is None
+            assert kwargs["issue"] is None
+            assert kwargs["pages"] is None
+            assert kwargs["publisher"] is None
 
 
 # ---------------------------------------------------------------------------
