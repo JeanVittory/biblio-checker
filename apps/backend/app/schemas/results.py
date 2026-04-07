@@ -71,6 +71,11 @@ class NormalizedReference(BaseModel):
     venue: str | None
     doi: str | None
     arxivId: str | None
+    issn: str | None = None
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None
+    publisher: str | None = None
 
 
 class MatchedRecord(BaseModel):

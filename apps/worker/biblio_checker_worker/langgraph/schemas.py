@@ -75,6 +75,11 @@ class NormalizedReference(BaseModel):
     venue: str | None
     doi: str | None
     arxivId: str | None
+    issn: str | None = None
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None
+    publisher: str | None = None
 
 
 class MatchedRecord(BaseModel):
@@ -243,5 +248,5 @@ class MatchCandidate:
     year: int | None
     doi: str | None
     url: str | None
-    match_type: str      # "doi_exact" | "title_fuzzy" | "identifier_exact" | "metadata_partial"
+    match_type: str      # "doi_exact" | "title_fuzzy" | "identifier_exact" | "metadata_partial" | "issn_filter"
     raw_score: float     # 0.0-1.0, source-specific similarity score
