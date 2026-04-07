@@ -5,7 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from biblio_checker_worker.langgraph.nodes.normalize import normalize_references
+from biblio_checker_worker.langgraph.nodes.normalize import (
+    _validate_issn,
+    normalize_references,
+)
 from biblio_checker_worker.langgraph.prompts.normalize import (
     NormalizedFields,
     NormalizedReferenceEntry,
@@ -33,6 +36,11 @@ def _make_normalized_fields(
     venue: str | None = "Some Journal",
     doi: str | None = None,
     arxiv_id: str | None = None,
+    issn: str | None = None,
+    volume: str | None = None,
+    issue: str | None = None,
+    pages: str | None = None,
+    publisher: str | None = None,
 ) -> NormalizedFields:
     return NormalizedFields(
         title=title,
@@ -41,6 +49,11 @@ def _make_normalized_fields(
         venue=venue,
         doi=doi,
         arxivId=arxiv_id,
+        issn=issn,
+        volume=volume,
+        issue=issue,
+        pages=pages,
+        publisher=publisher,
     )
 
 
@@ -142,8 +155,8 @@ class TestNormalNormalization:
 
         assert result["normalized_references"][0]["referenceId"] == "ref-001"
 
-    def test_normalized_dict_contains_six_fields(self) -> None:
-        """The 'normalized' sub-dict has title, authors, year, venue, doi, arxivId."""
+    def test_normalized_dict_contains_eleven_fields(self) -> None:
+        """The 'normalized' sub-dict has all 11 fields."""
         raw = _make_raw_refs("Author, A. (2021). Title. Journal, 5, 1-10.")
         output = _make_normalize_output(
             [
@@ -173,6 +186,11 @@ class TestNormalNormalization:
         assert "venue" in norm
         assert "doi" in norm
         assert "arxivId" in norm
+        assert "issn" in norm
+        assert "volume" in norm
+        assert "issue" in norm
+        assert "pages" in norm
+        assert "publisher" in norm
 
     def test_raw_text_preserved_in_output(self) -> None:
         """rawText in normalized entry matches the original raw reference text."""
@@ -521,3 +539,135 @@ class TestArxivIDValidation:
         assert "invalid_doi_format" in codes
         assert "invalid_arxiv_id_format" in codes
         assert len([c for c in codes if c in ("invalid_doi_format", "invalid_arxiv_id_format")]) == 2
+
+
+# ---------------------------------------------------------------------------
+# ISSN validation (unit tests for _validate_issn)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateIssn:
+    def test_valid_issn_passes(self) -> None:
+        assert _validate_issn("0034-8910") == ("0034-8910", None)
+
+    def test_valid_issn_with_x_check_digit(self) -> None:
+        assert _validate_issn("1234-567X") == ("1234-567X", None)
+
+    def test_valid_issn_with_lowercase_x_normalized_to_uppercase(self) -> None:
+        assert _validate_issn("1234-567x") == ("1234-567X", None)
+
+    def test_none_passes(self) -> None:
+        assert _validate_issn(None) == (None, None)
+
+    def test_missing_hyphen_fails(self) -> None:
+        issn, warning = _validate_issn("00348910")
+        assert issn is None
+        assert warning is not None
+        assert warning["code"] == "invalid_issn_format"
+
+    def test_too_short_fails(self) -> None:
+        issn, warning = _validate_issn("1234-56")
+        assert issn is None
+        assert warning is not None
+
+    def test_letters_in_prefix_fails(self) -> None:
+        issn, warning = _validate_issn("ABCD-1234")
+        assert issn is None
+        assert warning is not None
+
+    def test_warning_message_includes_issn_value(self) -> None:
+        """The warning message contains the offending ISSN string."""
+        _, warning = _validate_issn("bad-issn")
+        assert warning is not None
+        assert "bad-issn" in warning["message"]
+
+    def test_warning_reference_id_is_none_before_caller_fills_it(self) -> None:
+        """referenceId is None in the raw warning — caller fills it in."""
+        _, warning = _validate_issn("bad-issn")
+        assert warning is not None
+        assert warning["referenceId"] is None
+
+    def test_issn_validation_in_normalize_node_invalid_discarded(self) -> None:
+        """An invalid ISSN is set to None and a warning is added in the full node."""
+        raw = _make_raw_refs("A ref with bad ISSN.")
+        output = _make_normalize_output(
+            [(0, _make_normalized_fields(issn="00348910"))]
+        )
+        mock_llm = _mock_structured_llm(output)
+
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.normalize.get_llm",
+            return_value=mock_llm,
+        ):
+            result = normalize_references(_make_state(raw))
+
+        assert result["normalized_references"][0]["normalized"]["issn"] is None
+        assert "warnings" in result
+        codes = [w["code"] for w in result["warnings"]]
+        assert "invalid_issn_format" in codes
+
+    def test_issn_validation_in_normalize_node_valid_preserved(self) -> None:
+        """A valid ISSN passes through unchanged in the full node."""
+        raw = _make_raw_refs("A ref with valid ISSN.")
+        output = _make_normalize_output(
+            [(0, _make_normalized_fields(issn="0034-8910"))]
+        )
+        mock_llm = _mock_structured_llm(output)
+
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.normalize.get_llm",
+            return_value=mock_llm,
+        ):
+            result = normalize_references(_make_state(raw))
+
+        assert result["normalized_references"][0]["normalized"]["issn"] == "0034-8910"
+        assert "warnings" not in result
+
+    def test_issn_warning_includes_reference_id(self) -> None:
+        """The invalid_issn_format warning has the correct referenceId."""
+        raw = _make_raw_refs("A ref.")
+        output = _make_normalize_output(
+            [(0, _make_normalized_fields(issn="bad-issn"))]
+        )
+        mock_llm = _mock_structured_llm(output)
+
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.normalize.get_llm",
+            return_value=mock_llm,
+        ):
+            result = normalize_references(_make_state(raw))
+
+        issn_warning = next(
+            w for w in result["warnings"] if w["code"] == "invalid_issn_format"
+        )
+        assert issn_warning["referenceId"] == "ref-001"
+
+    def test_new_passthrough_fields_in_output(self) -> None:
+        """volume, issue, pages, publisher pass through as-is from LLM output."""
+        raw = _make_raw_refs("A journal article with full metadata.")
+        output = _make_normalize_output(
+            [
+                (
+                    0,
+                    _make_normalized_fields(
+                        volume="26",
+                        issue="3",
+                        pages="41-72",
+                        publisher=None,
+                    ),
+                )
+            ]
+        )
+        mock_llm = _mock_structured_llm(output)
+
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.normalize.get_llm",
+            return_value=mock_llm,
+        ):
+            result = normalize_references(_make_state(raw))
+
+        norm = result["normalized_references"][0]["normalized"]
+        assert norm["volume"] == "26"
+        assert norm["issue"] == "3"
+        assert norm["pages"] == "41-72"
+        assert norm["publisher"] is None

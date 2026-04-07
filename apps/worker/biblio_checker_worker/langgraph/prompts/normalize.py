@@ -47,6 +47,42 @@ class NormalizedFields(BaseModel):
             " Null if not present."
         ),
     )
+    issn: str | None = Field(
+        None,
+        description=(
+            "ISSN (International Standard Serial Number) of the journal."
+            " Format: '1234-5678'. Null if not present in the reference text."
+        ),
+    )
+    volume: str | None = Field(
+        None,
+        description=(
+            "Volume number of the journal or series."
+            " E.g., '26', '12'. Null if not applicable (books without volume)."
+        ),
+    )
+    issue: str | None = Field(
+        None,
+        description=(
+            "Issue or number within the volume."
+            " E.g., '3', '105-106'. Null if not present."
+        ),
+    )
+    pages: str | None = Field(
+        None,
+        description=(
+            "Page range or article number."
+            " E.g., '41-72', 'e12345'. Null if not present."
+        ),
+    )
+    publisher: str | None = Field(
+        None,
+        description=(
+            "Publisher name for books or proceedings."
+            " E.g., 'Cambridge University Press'."
+            " Null if not applicable (journal articles)."
+        ),
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -71,7 +107,7 @@ class NormalizeReferencesOutput(BaseModel):
     )
 
 
-NORMALIZE_SYSTEM_PROMPT = """You are a bibliographic metadata extractor. You receive a list of bibliographic references in any citation style (APA, Vancouver, Chicago, IEEE, Harvard, or any other format).
+NORMALIZE_SYSTEM_PROMPT = """You are a bibliographic metadata extractor. You receive a list of bibliographic references in any citation style (APA, MLA, Vancouver, Chicago, IEEE, Harvard, or any other format).
 
 For each reference, extract the following fields:
 - title: The title of the work (article, book, chapter, etc.)
@@ -80,6 +116,11 @@ For each reference, extract the following fields:
 - venue: The journal, conference, publisher, or other publication venue
 - doi: The DOI (Digital Object Identifier) without 'https://doi.org/' prefix
 - arxivId: The arXiv identifier (e.g., '2301.12345')
+- issn: The ISSN of the journal (e.g., '0034-8910'). Only extract if explicitly written in the reference
+- volume: The volume number of the journal (e.g., '26', '12')
+- issue: The issue or number within the volume (e.g., '3', '105-106')
+- pages: The page range or article number (e.g., '41-72', 'pp. 45-60' → '45-60')
+- publisher: The publisher name (for books/proceedings, not for journal articles)
 
 Rules:
 - Extract fields regardless of citation style — the format does not matter
@@ -88,6 +129,10 @@ Rules:
 - For arXiv, extract just the ID (e.g., '2301.12345'), not the full URL
 - For authors, preserve the format as it appears (e.g., 'Smith, J.' or 'John Smith')
 - For year, extract only the publication year, not access dates or retrieval dates
+- For pages, normalize to just the range (remove 'pp.', 'p.', etc.)
+- For volume and issue, extract just the number (remove 'vol.', 'n.º', 'no.', etc.)
+- For ISSN, only extract if the ISSN number is explicitly written in the reference text. Do NOT infer or look up ISSNs
+- For publisher, extract only for books and proceedings. For journal articles, leave null (the journal name goes in venue)
 - Process ALL references in the input — do not skip any
 - Return each reference with its corresponding index from the input list
 

@@ -24,6 +24,9 @@ logger = structlog.stdlib.get_logger(
 # one or more non-whitespace segments.
 _DOI_RE = re.compile(r"^10\.\d{4,}(/\S+)+$")
 
+# ISSN format: 4 digits, hyphen, 3 digits, check digit (0-9 or X)
+_ISSN_RE = re.compile(r"^\d{4}-\d{3}[\dXx]$")
+
 # arXiv ID patterns:
 #   new-style: YYMM.NNNNN[vN]  e.g. 2301.12345 or 2301.12345v2
 #   old-style: category/NNNNNNN  e.g. hep-ph/9901234
@@ -65,6 +68,24 @@ def _validate_arxiv_id(
         "message": (
             f"arXiv ID '{arxiv_id}' does not match expected format and was discarded."
         ),
+        "referenceId": None,  # filled in by caller
+        "details": None,
+    }
+    return None, warning
+
+
+def _validate_issn(issn: str | None) -> tuple[str | None, dict[str, Any] | None]:
+    """Validate an ISSN string.
+
+    Returns ``(issn, None)`` if valid, or ``(None, warning_dict)`` if invalid.
+    """
+    if issn is None:
+        return None, None
+    if _ISSN_RE.match(issn):
+        return issn.upper(), None  # Normalize lowercase 'x' check digit to 'X'
+    warning: dict[str, Any] = {
+        "code": "invalid_issn_format",
+        "message": f"ISSN '{issn}' does not match expected format and was discarded.",
         "referenceId": None,  # filled in by caller
         "details": None,
     }
@@ -146,6 +167,12 @@ def normalize_references(state: "GraphState") -> dict[str, Any]:
             arxiv_warning["referenceId"] = reference_id
             validation_warnings.append(arxiv_warning)
 
+        # Validate ISSN
+        valid_issn, issn_warning = _validate_issn(entry.normalized.issn)
+        if issn_warning is not None:
+            issn_warning["referenceId"] = reference_id
+            validation_warnings.append(issn_warning)
+
         normalized.append(
             {
                 "referenceId": reference_id,
@@ -157,6 +184,11 @@ def normalize_references(state: "GraphState") -> dict[str, Any]:
                     "venue": entry.normalized.venue,
                     "doi": valid_doi,
                     "arxivId": valid_arxiv,
+                    "issn": valid_issn,
+                    "volume": entry.normalized.volume,
+                    "issue": entry.normalized.issue,
+                    "pages": entry.normalized.pages,
+                    "publisher": entry.normalized.publisher,
                 },
             }
         )
