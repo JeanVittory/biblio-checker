@@ -22,6 +22,16 @@ _ARXIV_NS = "http://arxiv.org/schemas/atom"
 
 logger = structlog.stdlib.get_logger("biblio_checker_worker.langgraph.clients.arxiv")
 
+_ARXIV_QUERY_SPECIAL = re.compile(r'["\(\)]')
+_ARXIV_BOOLEAN_PATTERN = re.compile(r'\b(AND|OR|ANDNOT)\b', re.IGNORECASE)
+
+
+def _sanitize_arxiv_term(value: str) -> str:
+    """Remove arXiv boolean operators and syntax characters from a search term."""
+    cleaned = _ARXIV_BOOLEAN_PATTERN.sub("", value)
+    cleaned = _ARXIV_QUERY_SPECIAL.sub("", cleaned)
+    return cleaned.strip()
+
 
 def _validate_doi(doi: str) -> bool:
     return bool(_DOI_PATTERN.match(doi))
@@ -131,6 +141,11 @@ class ArxivClient:
         year: int | None,
         doi: str | None,
         arxiv_id: str | None,
+        issn: str | None = None,
+        volume: str | None = None,
+        issue: str | None = None,
+        pages: str | None = None,
+        publisher: str | None = None,
     ) -> list[MatchCandidate]:
         self._request_count = 0
 
@@ -158,7 +173,16 @@ class ArxivClient:
                 if result:
                     return result
 
-        # Strategy 3: Title search
+        # Strategy 3: Title + Author search
+        if title is not None and authors:
+            self._throttle()
+            logger.info("search_starting", source="arxiv", strategy="title_author_search", title=title, first_author=authors[0])
+            result = self._title_author_search(title, authors[0])
+            logger.info("search_complete", source="arxiv", candidates_found=len(result))
+            if result:
+                return result
+
+        # Strategy 4: Title only search
         if title is not None:
             self._throttle()
             logger.info("search_starting", source="arxiv", strategy="title_search", title=title)
@@ -193,9 +217,27 @@ class ArxivClient:
             logger.warning("search_parse_error", source="arxiv", strategy="doi_search", detail="XML parse error")
             return []
 
+    def _title_author_search(self, title: str, first_author: str) -> list[MatchCandidate]:
+        """Search by combined title and first author surname."""
+        surname = self._extract_surname(first_author[:128])
+        safe_title = _sanitize_arxiv_term(title[:500])
+        safe_surname = _sanitize_arxiv_term(surname)
+        search_query = f'ti:"{safe_title}" AND au:{safe_surname}'
+        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"search_query": search_query, "max_results": 5})
+        response = self._client.get("/query", params={"search_query": search_query, "max_results": 5})
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        try:
+            return _parse_feed(response.text, match_type="metadata_partial", raw_score=0.0)
+        except ValueError:
+            logger.warning("search_parse_error", source="arxiv", strategy="title_author_search", detail="XML parse error")
+            return []
+
     def _title_search(self, title: str) -> list[MatchCandidate]:
-        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"search_query": f'ti:"{title}"', "max_results": 5})
-        response = self._client.get("/query", params={"search_query": f'ti:"{title}"', "max_results": 5})
+        safe_title = _sanitize_arxiv_term(title[:500])
+        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"search_query": f'ti:"{safe_title}"', "max_results": 5})
+        response = self._client.get("/query", params={"search_query": f'ti:"{safe_title}"', "max_results": 5})
         if response.status_code == 404:
             return []
         response.raise_for_status()
@@ -204,6 +246,24 @@ class ArxivClient:
         except ValueError:
             logger.warning("search_parse_error", source="arxiv", strategy="title_search", detail="XML parse error")
             return []
+
+    @staticmethod
+    def _extract_surname(author_name: str) -> str:
+        """Extract the surname from an author name for arXiv search.
+
+        Handles common formats:
+        - 'Smith, J.' -> 'Smith'
+        - 'John Smith' -> 'Smith'
+        - 'L. Martínez' -> 'Martínez'
+        - 'Aristotle' -> 'Aristotle'
+        """
+        author_name = author_name.strip()
+        if "," in author_name:
+            # Format: "Surname, Given" -> take everything before the first comma
+            return author_name.split(",")[0].strip()
+        # Format: "Given Surname" -> take the last word
+        parts = author_name.split()
+        return parts[-1] if parts else author_name
 
     def close(self) -> None:
         self._client.close()

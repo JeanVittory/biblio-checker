@@ -64,7 +64,7 @@ class TestOpenAlexDoiLookup:
         work = _work_fixture()
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(200, json_body=work)):
-            results = client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None)
+            results = client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
 
         assert len(results) == 1
         candidate = results[0]
@@ -81,7 +81,7 @@ class TestOpenAlexDoiLookup:
     def test_doi_not_found_returns_empty_list(self) -> None:
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(404)):
-            results = client.search(title=None, authors=[], year=None, doi="10.1234/notfound", arxiv_id=None)
+            results = client.search(title=None, authors=[], year=None, doi="10.1234/notfound", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
         assert results == []
 
     def test_invalid_doi_format_skips_lookup_falls_through_to_title(self) -> None:
@@ -89,7 +89,7 @@ class TestOpenAlexDoiLookup:
         client = _make_client()
         title_response = _mock_response(200, json_body={"results": []})
         with patch.object(client._client, "get", return_value=title_response) as mock_get:
-            results = client.search(title="Some Title", authors=[], year=None, doi="not-a-doi", arxiv_id=None)
+            results = client.search(title="Some Title", authors=[], year=None, doi="not-a-doi", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
         # Should have called title search, not DOI path
         call_args = mock_get.call_args[0][0]
         assert "/works" in call_args or call_args == "/works"
@@ -106,7 +106,7 @@ class TestOpenAlexDoiLookup:
             return resp
 
         with patch.object(client._client, "get", side_effect=fake_get):
-            client.search(title=None, authors=[], year=None, doi="10.1234/ex(ample)", arxiv_id=None)
+            client.search(title=None, authors=[], year=None, doi="10.1234/ex(ample)", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
 
         assert len(captured_calls) == 1
         # Parentheses must be encoded
@@ -126,7 +126,7 @@ class TestOpenAlexTitleSearch:
         body = {"results": [work1, work2]}
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(200, json_body=body)):
-            results = client.search(title="NLP", authors=[], year=None, doi=None, arxiv_id=None)
+            results = client.search(title="NLP", authors=[], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
 
         assert len(results) == 2
         assert all(c.match_type == "title_fuzzy" for c in results)
@@ -136,7 +136,7 @@ class TestOpenAlexTitleSearch:
     def test_title_search_no_results_returns_empty_list(self) -> None:
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(200, json_body={"results": []})):
-            results = client.search(title="Completely Obscure", authors=[], year=None, doi=None, arxiv_id=None)
+            results = client.search(title="Completely Obscure", authors=[], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
         assert results == []
 
     def test_title_search_work_with_no_title_maps_to_none(self) -> None:
@@ -145,7 +145,7 @@ class TestOpenAlexTitleSearch:
         body = {"results": [work]}
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(200, json_body=body)):
-            results = client.search(title="Something", authors=[], year=None, doi=None, arxiv_id=None)
+            results = client.search(title="Something", authors=[], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
         assert results[0].title is None
 
 
@@ -155,22 +155,254 @@ class TestOpenAlexTitleSearch:
 
 class TestOpenAlexAuthorTitleSearch:
     def test_author_title_search_triggered_when_title_and_authors_provided(self) -> None:
-        """When title search returns empty, author+title search runs next."""
+        """When higher strategies return empty, author+title search runs."""
         work = _work_fixture()
         empty_body = {"results": []}
         results_body = {"results": [work]}
 
+        # title+author+year skipped (no year), title+year skipped (no year),
+        # author+title_search finds result
         responses = iter([
-            _mock_response(200, json_body=empty_body),   # title search returns empty
-            _mock_response(200, json_body=results_body), # author+title search finds result
+            _mock_response(200, json_body=results_body),  # author+title search finds result
         ])
 
         client = _make_client()
         with patch.object(client._client, "get", side_effect=lambda *a, **k: next(responses)):
-            results = client.search(title="Deep Learning", authors=["Jane Smith"], year=None, doi=None, arxiv_id=None)
+            results = client.search(title="Deep Learning", authors=["Jane Smith"], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
 
         assert len(results) == 1
         assert results[0].match_type == "metadata_partial"
+
+
+# ---------------------------------------------------------------------------
+# Title + Author + Year search (NEW)
+# ---------------------------------------------------------------------------
+
+class TestOpenAlexTitleAuthorYearSearch:
+    def test_returns_candidates_when_all_three_provided(self) -> None:
+        """title+author+year search returns results when all three fields are present."""
+        work = _work_fixture()
+        body = {"results": [work]}
+        client = _make_client()
+        with patch.object(client._client, "get", return_value=_mock_response(200, json_body=body)):
+            results = client.search(
+                title="Deep Learning for NLP",
+                authors=["Jane Smith"],
+                year=2020,
+                doi=None,
+                arxiv_id=None,
+                issn=None,
+                volume=None,
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+        assert len(results) == 1
+        assert results[0].match_type == "metadata_partial"
+
+    def test_skipped_when_year_is_none(self) -> None:
+        """Without year, strategy 2 is skipped; falls through to author+title (strategy 5)."""
+        work = _work_fixture()
+        body = {"results": [work]}
+        captured_params: list[dict] = []
+
+        def fake_get(path, **kwargs):
+            captured_params.append(kwargs.get("params", {}))
+            return _mock_response(200, json_body=body)
+
+        client = _make_client()
+        with patch.object(client._client, "get", side_effect=fake_get):
+            results = client.search(
+                title="Deep Learning for NLP",
+                authors=["Jane Smith"],
+                year=None,
+                doi=None,
+                arxiv_id=None,
+                issn=None,
+                volume=None,
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+
+        # The first call should NOT use publication_year in the filter
+        assert len(captured_params) >= 1
+        first_filter = captured_params[0].get("filter", "")
+        assert "publication_year" not in first_filter
+
+    def test_returns_empty_when_no_results(self) -> None:
+        """title+author+year returns empty list when API returns no results."""
+        client = _make_client()
+        # All strategies return empty
+        with patch.object(client._client, "get", return_value=_mock_response(200, json_body={"results": []})):
+            results = client.search(
+                title="Obscure Title",
+                authors=["Unknown Author"],
+                year=2020,
+                doi=None,
+                arxiv_id=None,
+                issn=None,
+                volume=None,
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+        assert results == []
+
+
+# ---------------------------------------------------------------------------
+# ISSN + Volume search (NEW)
+# ---------------------------------------------------------------------------
+
+class TestOpenAlexIssnVolumeSearch:
+    def test_returns_candidates_with_issn_and_volume(self) -> None:
+        """ISSN+volume search returns candidates when both fields are present."""
+        work = _work_fixture()
+        empty_body = {"results": []}
+        results_body = {"results": [work]}
+
+        # DOI is None, title+author+year skipped (no title/authors/year),
+        # ISSN+volume hits
+        responses = iter([
+            _mock_response(200, json_body=results_body),
+        ])
+        client = _make_client()
+        with patch.object(client._client, "get", side_effect=lambda *a, **k: next(responses)):
+            results = client.search(
+                title=None,
+                authors=[],
+                year=None,
+                doi=None,
+                arxiv_id=None,
+                issn="1234-5678",
+                volume="42",
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+        assert len(results) == 1
+        assert results[0].match_type == "metadata_partial"
+
+    def test_skipped_when_issn_is_none(self) -> None:
+        """Without ISSN, ISSN+volume strategy is skipped entirely."""
+        captured_params: list[dict] = []
+
+        def fake_get(path, **kwargs):
+            captured_params.append(kwargs.get("params", {}))
+            return _mock_response(200, json_body={"results": []})
+
+        client = _make_client()
+        with patch.object(client._client, "get", side_effect=fake_get):
+            results = client.search(
+                title="Some Title",
+                authors=[],
+                year=None,
+                doi=None,
+                arxiv_id=None,
+                issn=None,
+                volume="42",
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+
+        # No call should use ISSN filter
+        for params in captured_params:
+            filt = params.get("filter", "")
+            assert "primary_location.source.issn" not in filt
+
+    def test_skipped_when_volume_is_none(self) -> None:
+        """Without volume, ISSN+volume strategy is skipped."""
+        captured_params: list[dict] = []
+
+        def fake_get(path, **kwargs):
+            captured_params.append(kwargs.get("params", {}))
+            return _mock_response(200, json_body={"results": []})
+
+        client = _make_client()
+        with patch.object(client._client, "get", side_effect=fake_get):
+            results = client.search(
+                title="Some Title",
+                authors=[],
+                year=None,
+                doi=None,
+                arxiv_id=None,
+                issn="1234-5678",
+                volume=None,
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+
+        for params in captured_params:
+            filt = params.get("filter", "")
+            assert "biblio.volume" not in filt
+
+
+# ---------------------------------------------------------------------------
+# Title + Year search (NEW)
+# ---------------------------------------------------------------------------
+
+class TestOpenAlexTitleYearSearch:
+    def test_returns_candidates_with_title_and_year(self) -> None:
+        """Title+year search returns results when both fields are present."""
+        work = _work_fixture()
+        results_body = {"results": [work]}
+
+        captured_params: list[dict] = []
+
+        def fake_get(path, **kwargs):
+            params = kwargs.get("params", {})
+            captured_params.append(params)
+            filt = params.get("filter", "")
+            # Only return results for title+year query
+            if "publication_year" in filt and "raw_author_name" not in filt:
+                return _mock_response(200, json_body=results_body)
+            return _mock_response(200, json_body={"results": []})
+
+        client = _make_client()
+        with patch.object(client._client, "get", side_effect=fake_get):
+            results = client.search(
+                title="Deep Learning for NLP",
+                authors=[],
+                year=2020,
+                doi=None,
+                arxiv_id=None,
+                issn=None,
+                volume=None,
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+
+        assert len(results) == 1
+        assert results[0].match_type == "title_fuzzy"
+
+    def test_title_year_filter_uses_publication_year(self) -> None:
+        """The title+year strategy sends publication_year in the filter."""
+        captured_params: list[dict] = []
+
+        def fake_get(path, **kwargs):
+            captured_params.append(kwargs.get("params", {}))
+            return _mock_response(200, json_body={"results": []})
+
+        client = _make_client()
+        with patch.object(client._client, "get", side_effect=fake_get):
+            client.search(
+                title="Some Paper",
+                authors=[],
+                year=2021,
+                doi=None,
+                arxiv_id=None,
+                issn=None,
+                volume=None,
+                issue=None,
+                pages=None,
+                publisher=None,
+            )
+
+        filters_used = [p.get("filter", "") for p in captured_params]
+        assert any("publication_year:2021" in f for f in filters_used)
 
 
 # ---------------------------------------------------------------------------
@@ -182,13 +414,13 @@ class TestOpenAlexHttpErrors:
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(500)):
             with pytest.raises(httpx.HTTPStatusError):
-                client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None)
+                client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
 
     def test_http_429_propagates_as_exception(self) -> None:
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(429)):
             with pytest.raises(httpx.HTTPStatusError):
-                client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None)
+                client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
 
 
 # ---------------------------------------------------------------------------
@@ -203,14 +435,14 @@ class TestOpenAlexMalformedResponse:
         resp.json.side_effect = ValueError("not JSON")
         client = _make_client()
         with patch.object(client._client, "get", return_value=resp):
-            results = client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None)
+            results = client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
         assert results == []
 
     def test_malformed_results_field_returns_empty_list(self) -> None:
         body = {"results": "not-a-list"}
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(200, json_body=body)):
-            results = client.search(title="Something", authors=[], year=None, doi=None, arxiv_id=None)
+            results = client.search(title="Something", authors=[], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
         assert results == []
 
 

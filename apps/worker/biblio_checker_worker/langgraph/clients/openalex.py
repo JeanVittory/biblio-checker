@@ -20,6 +20,11 @@ def _validate_doi(doi: str) -> bool:
     return bool(_DOI_PATTERN.match(doi))
 
 
+def _sanitize_filter_value(value: str) -> str:
+    """Remove characters that OpenAlex uses as filter delimiters."""
+    return value.replace(",", " ").replace(":", " ")
+
+
 def _extract_openalex_id(openalex_url: str) -> str:
     """Extract the W-prefixed ID from an OpenAlex URL."""
     return openalex_url.rstrip("/").split("/")[-1]
@@ -81,6 +86,11 @@ class OpenAlexClient:
         year: int | None,
         doi: str | None,
         arxiv_id: str | None,
+        issn: str | None = None,
+        volume: str | None = None,
+        issue: str | None = None,
+        pages: str | None = None,
+        publisher: str | None = None,
     ) -> list[MatchCandidate]:
         # Strategy 1: DOI lookup
         if doi is not None:
@@ -93,20 +103,45 @@ class OpenAlexClient:
                 if result:
                     return result
 
-        # Strategy 2: Title search (no authors filter)
+        # Strategy 2: Title + Author + Year
+        if title is not None and authors and year is not None:
+            logger.info("search_starting", source="openalex", strategy="title_author_year_search", title=title, first_author=authors[0], year=year)
+            result = self._title_author_year_search(title, authors[0], year)
+            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            if result:
+                return result
+
+        # Strategy 3: ISSN + Volume
+        if issn is not None and volume is not None:
+            logger.info("search_starting", source="openalex", strategy="issn_volume_search", issn=issn, volume=volume)
+            result = self._issn_volume_search(issn, volume)
+            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            if result:
+                return result
+
+        # Strategy 4: Title + Year
+        if title is not None and year is not None:
+            logger.info("search_starting", source="openalex", strategy="title_year_search", title=title, year=year)
+            result = self._title_year_search(title, year)
+            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            if result:
+                return result
+
+        # Strategy 5: Author + Title search
+        if title is not None and authors:
+            logger.info("search_starting", source="openalex", strategy="author_title_search", title=title, first_author=authors[0])
+            result = self._author_title_search(title, authors[0])
+            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            if result:
+                return result
+
+        # Strategy 6: Title only
         if title is not None:
             logger.info("search_starting", source="openalex", strategy="title_search", title=title)
             result = self._title_search(title)
             logger.info("search_complete", source="openalex", candidates_found=len(result))
             if result:
                 return result
-
-        # Strategy 3: Author + Title search
-        if title is not None and authors:
-            logger.info("search_starting", source="openalex", strategy="author_title_search", title=title, first_author=authors[0])
-            result = self._author_title_search(title, authors[0])
-            logger.info("search_complete", source="openalex", candidates_found=len(result))
-            return result
 
         logger.info("search_complete", source="openalex", candidates_found=0)
         return []
@@ -132,10 +167,46 @@ class OpenAlexClient:
             return []
         return [_parse_work(work, match_type="doi_exact", raw_score=1.0)]
 
+    def _title_author_year_search(self, title: str, first_author: str, year: int) -> list[MatchCandidate]:
+        """Search by title, first author name, and publication year combined."""
+        safe_title = _sanitize_filter_value(title[:500])
+        safe_author = _sanitize_filter_value(first_author[:128])
+        filter_value = f"title.search:{safe_title},raw_author_name.search:{safe_author},publication_year:{year}"
+        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
+        response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        return self._parse_results_page(response, match_type="metadata_partial", raw_score=0.0)
+
+    def _issn_volume_search(self, issn: str, volume: str) -> list[MatchCandidate]:
+        """Search by journal ISSN and volume number combined."""
+        safe_issn = _sanitize_filter_value(issn)
+        safe_volume = _sanitize_filter_value(volume[:20])
+        filter_value = f"primary_location.source.issn:{safe_issn},biblio.volume:{safe_volume}"
+        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
+        response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        return self._parse_results_page(response, match_type="metadata_partial", raw_score=0.0)
+
+    def _title_year_search(self, title: str, year: int) -> list[MatchCandidate]:
+        """Search by title and publication year combined."""
+        safe_title = _sanitize_filter_value(title[:500])
+        filter_value = f"title.search:{safe_title},publication_year:{year}"
+        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
+        response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+        if response.status_code == 404:
+            return []
+        response.raise_for_status()
+        return self._parse_results_page(response, match_type="title_fuzzy", raw_score=0.0)
+
     def _title_search(self, title: str) -> list[MatchCandidate]:
-        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": f"title.search:{title}"})
+        safe_title = _sanitize_filter_value(title[:500])
+        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": f"title.search:{safe_title}"})
         try:
-            response = self._client.get("/works", params={"filter": f"title.search:{title}", "per_page": 5})
+            response = self._client.get("/works", params={"filter": f"title.search:{safe_title}", "per_page": 5})
         except httpx.HTTPStatusError:
             raise
         if response.status_code == 404:
@@ -144,7 +215,9 @@ class OpenAlexClient:
         return self._parse_results_page(response, match_type="title_fuzzy", raw_score=0.0)
 
     def _author_title_search(self, title: str, first_author: str) -> list[MatchCandidate]:
-        filter_value = f"title.search:{title},authorships.author.display_name.search:{first_author}"
+        safe_title = _sanitize_filter_value(title[:500])
+        safe_author = _sanitize_filter_value(first_author[:128])
+        filter_value = f"title.search:{safe_title},raw_author_name.search:{safe_author}"
         logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
         try:
             response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})

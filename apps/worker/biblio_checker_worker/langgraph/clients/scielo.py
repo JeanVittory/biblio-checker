@@ -101,6 +101,11 @@ class ScieloClient:
         year: int | None,
         doi: str | None,
         arxiv_id: str | None,
+        issn: str | None = None,
+        volume: str | None = None,
+        issue: str | None = None,
+        pages: str | None = None,
+        publisher: str | None = None,
     ) -> list[MatchCandidate]:
         # Strategy 1: DOI lookup
         if doi is not None:
@@ -113,10 +118,10 @@ class ScieloClient:
                 if result:
                     return result
 
-        # Strategy 2: Title search
-        if title is not None:
-            logger.info("search_starting", source="scielo", strategy="title_search", title=title)
-            result = self._title_search(title)
+        # Strategy 2: ISSN search
+        if issn is not None:
+            logger.info("search_starting", source="scielo", strategy="issn_search", issn=issn)
+            result = self._issn_search(issn)
             logger.info("search_complete", source="scielo", candidates_found=len(result))
             return result
 
@@ -146,23 +151,24 @@ class ScieloClient:
             return []
         return [candidate]
 
-    def _title_search(self, title: str) -> list[MatchCandidate]:
-        logger.debug("search_request", source="scielo", url=f"{self._client.base_url}/article/identifiers/", params={"title": title, "limit": 5})
-        response = self._client.get("/article/identifiers/", params={"title": title, "limit": 5})
+    def _issn_search(self, issn: str) -> list[MatchCandidate]:
+        """Two-step ISSN search: fetch article identifiers, then fetch each article by PID."""
+        logger.debug("search_request", source="scielo", url=f"{self._client.base_url}/article/identifiers/", params={"issn": issn, "limit": 5})
+        response = self._client.get("/article/identifiers/", params={"issn": issn, "limit": 5})
         if response.status_code == 404:
             return []
         response.raise_for_status()
         try:
             data = response.json()
         except Exception:
-            logger.warning("search_parse_error", source="scielo", strategy="title_search", detail="malformed JSON")
+            logger.warning("search_parse_error", source="scielo", strategy="issn_search", detail="malformed JSON")
             return []
         if not isinstance(data, dict):
-            logger.warning("search_parse_error", source="scielo", strategy="title_search", detail="unexpected response shape")
+            logger.warning("search_parse_error", source="scielo", strategy="issn_search", detail="unexpected response shape")
             return []
         objects: list[Any] = data.get("objects", [])
         if not isinstance(objects, list):
-            logger.warning("search_parse_error", source="scielo", strategy="title_search", detail="objects field not a list")
+            logger.warning("search_parse_error", source="scielo", strategy="issn_search", detail="objects field not a list")
             return []
 
         candidates: list[MatchCandidate] = []
@@ -173,13 +179,13 @@ class ScieloClient:
             collection = obj.get("collection", "")
             if not pid:
                 continue
-            candidate = self._fetch_article_by_pid(pid, collection)
+            candidate = self._fetch_article_by_pid(pid, collection, match_type="issn_filter")
             if candidate is not None:
                 candidates.append(candidate)
 
         return candidates
 
-    def _fetch_article_by_pid(self, pid: str, collection: str) -> MatchCandidate | None:
+    def _fetch_article_by_pid(self, pid: str, collection: str, match_type: str = "title_fuzzy") -> MatchCandidate | None:
         params: dict[str, Any] = {"code": pid}
         if collection:
             params["collection"] = collection
@@ -197,7 +203,7 @@ class ScieloClient:
             logger.warning("search_parse_error", source="scielo", strategy="pid_fetch", pid=pid, detail="unexpected response shape")
             return None
         try:
-            return _parse_article(data, match_type="title_fuzzy", raw_score=0.0)
+            return _parse_article(data, match_type=match_type, raw_score=0.0)
         except Exception:
             logger.warning("search_parse_error", source="scielo", strategy="pid_fetch", pid=pid, detail="could not parse article")
             return None
