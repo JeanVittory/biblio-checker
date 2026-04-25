@@ -9,7 +9,8 @@
     "copy": "Copiar",
     "loading": "Cargando…",
     "language_label": "Idioma",
-    "theme_label": "Tema"
+    "theme_label": "Tema",
+    "back_to_home": "Volver al inicio"
   },
   "home": {
     "hero_title": "Sube tu bibliografía",
@@ -29,7 +30,13 @@
     "trySample": "Probar con un ejemplo",
     "sampleDescription": "Ve un análisis de muestra con referencias reales y fabricadas",
     "sampleLoading": "Cargando ejemplo...",
-    "or": "o"
+    "or": "o",
+    "lockedPrompt": "Subida de documentos próximamente",
+    "lockedHint": "Mientras tanto, prueba el análisis con el ejemplo"
+  },
+  "featureLocked": {
+    "uploadTooltip": "Próximamente disponible — el análisis con tu propio documento se habilitará pronto",
+    "tryDemoInstead": "Mientras tanto, prueba con el ejemplo"
   },
   "recent": {
     "title": "Análisis recientes",
