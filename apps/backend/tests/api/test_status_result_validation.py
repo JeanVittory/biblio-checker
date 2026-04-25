@@ -5,7 +5,7 @@ status controller (app.api.controllers.analysis.status).
 Strategy
 --------
 All tests mock `get_analysis_job_by_id` so no real database is required.
-A valid poll_status_token ("tok-abc") and a future poll_status_token_expires_at are injected into
+A valid poll_status_token and a future poll_status_token_expires_at are injected into
 every mocked DB row so that the token/expiry guards pass.  The tests focus
 exclusively on how the controller handles the `results` column value from the
 DB, specifically:
@@ -23,7 +23,7 @@ established in tests/test_verify_authenticity_validation.py.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -39,7 +39,7 @@ DUMMY_JOB_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 VALID_TOKEN = "tok-abc"
 
 # A token that expires one hour in the future guarantees the expiry guard passes.
-_FUTURE_EXPIRES_AT = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+_FUTURE_EXPIRES_AT = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
 
 STATUS_URL = "/api/analysis/status"
 
@@ -131,14 +131,19 @@ def _make_row(
         "poll_status_token": VALID_TOKEN,
         "poll_status_token_expires_at": _FUTURE_EXPIRES_AT,
         "created_at": "2024-01-01T00:00:00+00:00",
-        "completed_at": "2024-01-01T00:01:00+00:00" if status in {"succeeded", "failed"} else None,
+        "completed_at": "2024-01-01T00:01:00+00:00"
+        if status in {"succeeded", "failed"}
+        else None,
         "stage": stage,
-        "results": results,
-        "error": error,
+        # Controller reads 'result_json' (the actual DB column name).
+        "result_json": results,
+        "error_detail": error,
     }
 
 
-async def _get(job_id: str = DUMMY_JOB_ID, job_token: str = VALID_TOKEN) -> httpx.Response:
+async def _get(
+    job_id: str = DUMMY_JOB_ID, job_token: str = VALID_TOKEN
+) -> httpx.Response:
     """Issue GET /api/analysis/status with the given query parameters."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(

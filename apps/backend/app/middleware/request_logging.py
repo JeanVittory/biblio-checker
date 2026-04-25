@@ -34,9 +34,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             structlog.contextvars.bind_contextvars(duration_ms=duration_ms)
 
         log_level = "warning" if response.status_code >= 500 else "info"
-        getattr(logger, log_level)(
-            "request_finished", status_code=response.status_code
-        )
+        getattr(logger, log_level)("request_finished", status_code=response.status_code)
 
         response.headers["X-Request-ID"] = request_id
         return response

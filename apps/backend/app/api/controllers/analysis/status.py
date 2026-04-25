@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import structlog
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Header, Query
 from fastapi.responses import JSONResponse
 
+from app.api.i18n.http_errors import t
 from app.schemas.analysis import JobStatusResponse
 from app.schemas.analysis_jobs import AnalysisJobStatus
 from app.schemas.results import ResultsV1
@@ -19,26 +20,26 @@ logger = structlog.stdlib.get_logger(__name__)
 
 router = APIRouter()
 
-_INVALID_TOKEN_RESPONSE = JSONResponse(
-    status_code=401,
-    content={"error": "Invalid or expired token"},
-)
 
-_JOB_NOT_FOUND_RESPONSE = JSONResponse(
-    status_code=404,
-    content={"error": "Invalid or expired token"},
-)
+def _invalid_token_response(accept_language: str | None) -> JSONResponse:
+    return JSONResponse(
+        status_code=401,
+        content={"error": t("invalid_or_expired_token", accept_language)},
+    )
 
-_SERVICE_UNAVAILABLE_RESPONSE = JSONResponse(
-    status_code=502,
-    content={"error": "Service temporarily unavailable"},
-)
+
+def _service_unavailable_response(accept_language: str | None) -> JSONResponse:
+    return JSONResponse(
+        status_code=502,
+        content={"error": t("service_temporarily_unavailable", accept_language)},
+    )
 
 
 @router.get("/status", response_model=JobStatusResponse)
 async def get_job_status(
     jobId: str = Query(..., min_length=1),
     jobToken: str = Query(..., min_length=1),
+    accept_language: str | None = Header(default=None, alias="Accept-Language"),
 ) -> JobStatusResponse | JSONResponse:
     logger.info("job_status_requested", job_id=jobId)
 
@@ -50,24 +51,24 @@ async def get_job_status(
             job_id=jobId,
             error_code=exc.code,
         )
-        return _SERVICE_UNAVAILABLE_RESPONSE
+        return _service_unavailable_response(accept_language)
 
     # Job not found — return 404 (same message as token mismatch to prevent enumeration)
     if row is None:
         logger.warning("job_status_not_found", job_id=jobId)
-        return _JOB_NOT_FOUND_RESPONSE
+        return _invalid_token_response(accept_language)
 
     # Token comparison
     stored_token: str | None = row.get("poll_status_token")
     if not stored_token or stored_token != jobToken:
         logger.warning("job_status_token_invalid", job_id=jobId)
-        return _INVALID_TOKEN_RESPONSE
+        return _invalid_token_response(accept_language)
 
     # Expiry check
     raw_expires_at = row.get("poll_status_token_expires_at")
     if not raw_expires_at:
         logger.warning("job_status_token_invalid", job_id=jobId)
-        return _INVALID_TOKEN_RESPONSE
+        return _invalid_token_response(accept_language)
 
     try:
         expires_at = coerce_utc_datetime(
@@ -75,11 +76,11 @@ async def get_job_status(
         )
     except ValueError:
         logger.warning("job_status_token_invalid", job_id=jobId)
-        return _INVALID_TOKEN_RESPONSE
+        return _invalid_token_response(accept_language)
 
     if datetime.now(UTC) >= expires_at:
         logger.warning("job_status_token_invalid", job_id=jobId)
-        return _INVALID_TOKEN_RESPONSE
+        return _invalid_token_response(accept_language)
 
     # Build the response — never include poll_status_token or
     # poll_status_token_expires_at
@@ -89,7 +90,7 @@ async def get_job_status(
     try:
         submitted_at = coerce_utc_datetime(raw_created_at, field="created_at")
     except ValueError:
-        return _SERVICE_UNAVAILABLE_RESPONSE
+        return _service_unavailable_response(accept_language)
 
     raw_completed_at = row.get("completed_at")
     completed_at: datetime | None = None
@@ -97,11 +98,11 @@ async def get_job_status(
         try:
             completed_at = coerce_utc_datetime(raw_completed_at, field="completed_at")
         except ValueError:
-            return _SERVICE_UNAVAILABLE_RESPONSE
+            return _service_unavailable_response(accept_language)
 
     result: ResultsV1 | None = None
     if status == AnalysisJobStatus.SUCCEEDED:
-        raw_results = row.get("results")
+        raw_results = row.get("result_json")
         if raw_results is not None:
             try:
                 result = ResultsV1.model_validate(raw_results)
@@ -110,7 +111,7 @@ async def get_job_status(
                 logger.warning("job_status_result_validation_failed", job_id=jobId)
                 result = None
 
-    error = row.get("error") if status == AnalysisJobStatus.FAILED else None
+    error = row.get("error_detail") if status == AnalysisJobStatus.FAILED else None
 
     return JobStatusResponse(
         jobId=str(row["id"]),

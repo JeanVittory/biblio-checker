@@ -17,9 +17,10 @@ class SupabaseClientError(Exception):
 
 
 def get_supabase_admin_client() -> Client:
-    if not (settings.supabase_url or "").strip() or not (
-        settings.supabase_service_role_key or ""
-    ).strip():
+    if (
+        not (settings.supabase_url or "").strip()
+        or not (settings.supabase_service_role_key or "").strip()
+    ):
         logger.error("supabase_client_misconfigured")
         raise SupabaseClientError(code="server_misconfigured")
 

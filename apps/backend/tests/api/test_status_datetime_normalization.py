@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
+from app.api.i18n.http_errors import t
 from app.main import app
 
 DUMMY_JOB_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
@@ -93,7 +94,7 @@ async def test_token_expires_at_invalid_type_returns_401():
         resp = await _get()
 
     assert resp.status_code == 401
-    assert resp.json() == {"error": "Invalid or expired token"}
+    assert resp.json() == {"error": t("invalid_or_expired_token", None)}
 
 
 @pytest.mark.anyio
@@ -110,7 +111,7 @@ async def test_created_at_invalid_returns_502():
         resp = await _get()
 
     assert resp.status_code == 502
-    assert resp.json() == {"error": "Service temporarily unavailable"}
+    assert resp.json() == {"error": t("service_temporarily_unavailable", None)}
 
 
 @pytest.mark.anyio
@@ -145,7 +146,7 @@ async def test_completed_at_invalid_string_returns_502():
         resp = await _get()
 
     assert resp.status_code == 502
-    assert resp.json() == {"error": "Service temporarily unavailable"}
+    assert resp.json() == {"error": t("service_temporarily_unavailable", None)}
 
 
 @pytest.mark.anyio

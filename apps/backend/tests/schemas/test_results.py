@@ -341,21 +341,21 @@ class TestInvalidCases:
             ResultsV1.model_validate(data)
 
     def test_processing_error_with_non_null_band_raises(self):
-        """processing_error + confidenceBand='low' (not null) must raise ValidationError."""
+        """processing_error + non-null confidenceBand must raise ValidationError."""
         data = copy.deepcopy(VALID_PROCESSING_ERROR)
         data["references"][0]["confidenceBand"] = "low"
         with pytest.raises(ValidationError):
             ResultsV1.model_validate(data)
 
     def test_processing_error_with_non_null_score_raises(self):
-        """processing_error + confidenceScore=0.5 (not null) must raise ValidationError."""
+        """processing_error + non-null confidenceScore must raise ValidationError."""
         data = copy.deepcopy(VALID_PROCESSING_ERROR)
         data["references"][0]["confidenceScore"] = 0.5
         with pytest.raises(ValidationError):
             ResultsV1.model_validate(data)
 
     def test_ambiguous_with_manual_review_false_raises(self):
-        """ambiguous + manualReviewRequired=False must raise ValidationError (must be True)."""
+        """ambiguous + manualReviewRequired=False must raise ValidationError."""
         data = _make_result(
             [
                 _make_ref(
@@ -371,19 +371,19 @@ class TestInvalidCases:
             ResultsV1.model_validate(data)
 
     def test_references_length_differs_from_total_analyzed_raises(self):
-        """references.length != totalReferencesAnalyzed violates cross-field invariant."""
+        """references.length != totalReferencesAnalyzed violates invariant."""
         data = copy.deepcopy(VALID_VERIFIED)
         # Claim 2 analyzed but only 1 reference object present.
         data["summary"]["totalReferencesAnalyzed"] = 2
         data["summary"]["totalReferencesDetected"] = 2
-        # Keep countsByClassification sum consistent with the new totalReferencesAnalyzed
+        # Keep countsByClassification sum consistent with new totalReferencesAnalyzed
         # so only the references-length invariant fails.
         data["summary"]["countsByClassification"]["verified"] = 2
         with pytest.raises(ValidationError):
             ResultsV1.model_validate(data)
 
     def test_counts_sum_differs_from_total_analyzed_raises(self):
-        """sum(countsByClassification) != totalReferencesAnalyzed must raise ValidationError."""
+        """sum(countsByClassification) != totalReferencesAnalyzed must raise."""
         data = copy.deepcopy(VALID_VERIFIED)
         # totalReferencesAnalyzed=1, references has 1 entry, but counts sum to 2.
         data["summary"]["countsByClassification"]["verified"] = 2
@@ -391,7 +391,7 @@ class TestInvalidCases:
             ResultsV1.model_validate(data)
 
     def test_analyzed_greater_than_detected_raises(self):
-        """totalReferencesAnalyzed > totalReferencesDetected must raise ValidationError."""
+        """totalReferencesAnalyzed > totalReferencesDetected must raise."""
         data = copy.deepcopy(VALID_VERIFIED)
         # Set detected=0 while analyzed=1 (from the single reference).
         data["summary"]["totalReferencesDetected"] = 0
@@ -446,7 +446,7 @@ class TestInvalidCases:
             ResultsV1.model_validate(data)
 
     def test_unknown_root_field_raises(self):
-        """An unknown field at the root level must raise ValidationError (extra='forbid')."""
+        """An unknown root field must raise ValidationError (extra='forbid')."""
         data = copy.deepcopy(VALID_VERIFIED)
         data["unknownField"] = "should-not-be-here"
         with pytest.raises(ValidationError):

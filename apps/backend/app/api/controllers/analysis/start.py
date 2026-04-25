@@ -50,6 +50,7 @@ async def start_analysis(
             "poll_status_token": poll_token,
             "poll_status_token_expires_at": poll_token_expires_at.isoformat(),
             "source_type": payload.document.sourceType,
+            "locale": payload.locale,
         }
         inserted = await create_analysis_job(job_row)
         job_id = (

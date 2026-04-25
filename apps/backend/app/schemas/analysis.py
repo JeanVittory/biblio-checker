@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from app.core.config import settings
 from app.schemas.analysis_jobs import AnalysisJobStatus
 from app.schemas.results import ResultsV1
+
+# Supported locales — must stay in sync with the DB CHECK constraint and the
+# worker i18n module.
+Locale = Literal["es", "pt", "en"]
 
 SOURCE_TYPE_TO_MIME: dict[str, str] = {
     "pdf": "application/pdf",
@@ -62,6 +66,15 @@ class VerifyAuthenticityRequest(BaseModel):
     requestId: UUID
     storage: StoragePayload
     integrity: IntegrityPayload
+    locale: Locale = Field(
+        default="es",
+        description=(
+            "Language for worker-rendered text (decisionReason, warnings[].message). "
+            "Must be a canonical two-letter code: 'es', 'pt', or 'en'. "
+            "Region suffixes (e.g. 'es-ES') are NOT normalised server-side and will "
+            "cause a 422 validation error. Immutable after job creation."
+        ),
+    )
 
     @model_validator(mode="after")
     def check_cross_field_consistency(self) -> "VerifyAuthenticityRequest":
@@ -78,9 +91,7 @@ class VerifyAuthenticityRequest(BaseModel):
         # Rule 3: storage.path must contain the requestId
         request_id_str = str(self.requestId)
         if request_id_str not in self.storage.path:
-            errors.append(
-                f"storage.path must contain the requestId '{request_id_str}'"
-            )
+            errors.append(f"storage.path must contain the requestId '{request_id_str}'")
 
         # Rule 4: document.fileName must match the filename in storage.path
         path_filename = PurePosixPath(self.storage.path).name
@@ -130,3 +141,23 @@ class JobStatusResponse(BaseModel):
     error: str | None = None
     submittedAt: datetime
     completedAt: datetime | None = None
+
+
+class ShareTokenResponse(BaseModel):
+    """Response body for POST /api/analysis/share (success path)."""
+
+    success: bool
+    shareToken: str
+    expiresAt: str  # ISO 8601
+
+
+class SharedAnalysisResponse(BaseModel):
+    """Response body for GET /api/analysis/shared/{shareToken} (success path)."""
+
+    success: bool
+    jobId: str
+    status: Literal["succeeded"]
+    result: ResultsV1 | None
+    completedAt: str | None  # ISO 8601
+    fileName: str | None  # always null in v1 (security requirement)
+    expiresAt: str  # ISO 8601
