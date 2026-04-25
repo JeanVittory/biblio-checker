@@ -25,3 +25,6 @@ __pycache__/
 .ruff_cache/
 .mcp.json
 .codex
+
+# Claude local worktrees (should not be committed)
+.claude/worktrees/
