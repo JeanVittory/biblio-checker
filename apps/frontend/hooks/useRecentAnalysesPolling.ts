@@ -50,7 +50,16 @@ export interface UseRecentAnalysesPollingResult {
 }
 
 export function useRecentAnalysesPolling(): UseRecentAnalysesPollingResult {
-  const [jobs, setJobs] = useState<StoredJob[]>(() => readJobs());
+  const [jobs, setJobs] = useState<StoredJob[]>([]);
+  const hydrated = useRef(false);
+
+  // Sync from localStorage after first client render to avoid hydration mismatch.
+  useEffect(() => {
+    if (!hydrated.current) {
+      hydrated.current = true;
+      setJobs(readJobs());
+    }
+  }, []);
 
   /**
    * Maps jobId → setInterval return value for every currently active poll.
@@ -153,7 +162,7 @@ export function useRecentAnalysesPolling(): UseRecentAnalysesPollingResult {
         if (status !== undefined) updates.status = status;
         if (typeof data.stage === "string") updates.stage = data.stage;
         if (typeof data.stage === "object") updates.stage = null; // reset if backend clears it
-        if ("result" in data) {
+        if ("result" in data && data.result !== null) {
           updates.result = parseResultsV1(data.result);
         }
         if (typeof data.error === "string") updates.error = data.error;

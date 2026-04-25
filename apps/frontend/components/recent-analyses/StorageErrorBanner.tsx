@@ -1,4 +1,7 @@
+"use client";
+
 import { AlertTriangle } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 export type StorageErrorBannerProps = {
@@ -6,10 +9,8 @@ export type StorageErrorBannerProps = {
 };
 
 export function StorageErrorBanner({ variant }: StorageErrorBannerProps) {
-  const message =
-    variant === "full"
-      ? "Storage full. Please remove old jobs to continue."
-      : "Unable to load job history. Data may be corrupted.";
+  const t = useTranslations("errors");
+  const message = variant === "full" ? t("storage_full") : t("storage_corrupted");
 
   return (
     <div

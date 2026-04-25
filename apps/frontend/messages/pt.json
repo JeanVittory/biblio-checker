@@ -1,0 +1,268 @@
+{
+  "common": {
+    "app_name": "Biblio Checker",
+    "submit": "Enviar",
+    "cancel": "Cancelar",
+    "remove": "Remover",
+    "retry": "Tentar novamente",
+    "close": "Fechar",
+    "copy": "Copiar",
+    "loading": "Carregando…",
+    "language_label": "Idioma",
+    "theme_label": "Tema"
+  },
+  "home": {
+    "hero_title": "Envie sua bibliografia",
+    "hero_subtitle": "Envie um arquivo PDF ou DOCX.",
+    "footer_tagline": "Biblio Checker — Validação de referências acadêmicas"
+  },
+  "upload": {
+    "uploading": "Enviando {fileName}…",
+    "upload_success": "Arquivo enviado com sucesso.",
+    "upload_another": "Enviar outro arquivo"
+  },
+  "dropzone": {
+    "prompt_primary": "Solte seu arquivo aqui",
+    "prompt_secondary": "PDF ou DOCX, até 10 MB",
+    "validation_file_too_large": "O arquivo excede o tamanho máximo de 10 MB.",
+    "validation_unsupported_format": "Apenas arquivos PDF e DOCX são permitidos.",
+    "trySample": "Experimentar com um exemplo",
+    "sampleDescription": "Veja uma análise de exemplo com referências reais e fabricadas",
+    "sampleLoading": "Carregando exemplo...",
+    "or": "ou"
+  },
+  "recent": {
+    "title": "Análises recentes",
+    "empty_state": "Nenhuma análise ainda. Envie um arquivo para começar.",
+    "columns": {
+      "file": "Arquivo",
+      "submitted": "Enviado",
+      "status": "Status",
+      "actions": "Ações"
+    },
+    "actions": {
+      "view_details": "Ver detalhes",
+      "hide_details": "Ocultar detalhes",
+      "remove_job": "Remover tarefa"
+    }
+  },
+  "status": {
+    "queued": "Na fila",
+    "running": "Em execução",
+    "succeeded": "Concluído",
+    "failed": "Falhou",
+    "expired": "Expirado",
+    "waiting": "Aguardando processamento…",
+    "stage_label": "Etapa: {stage}",
+    "processing_elapsed": "(processando há {elapsedLabel})",
+    "processing_started": "Processando… (iniciado há {elapsedLabel})"
+  },
+  "results": {
+    "section": {
+      "analysis_result": "Resultado da análise",
+      "reference_details": "Detalhes da referência",
+      "raw_text": "Texto original",
+      "normalized_fields": "Campos normalizados",
+      "decision_reason": "Razão da decisão",
+      "candidates_found": "{count, plural, =0 {Nenhum candidato} one {# candidato} other {# candidatos}}",
+      "reference": "Referência",
+      "candidate": "Candidato",
+      "view_record": "Ver registro"
+    },
+    "summary": {
+      "detected": "Referências detectadas",
+      "analyzed": "Referências analisadas"
+    },
+    "fields": {
+      "authors": "Autores",
+      "year": "Ano",
+      "venue": "Revista/Editora",
+      "publisher": "Editora",
+      "doi": "DOI",
+      "arxiv_id": "arXiv ID",
+      "issn": "ISSN",
+      "volume": "Volume",
+      "issue": "Número",
+      "pages": "Páginas",
+      "confidence": "Confiança"
+    },
+    "classification": {
+      "verified": "Verificada",
+      "likely_verified": "Prov. verificada",
+      "ambiguous": "Ambígua",
+      "not_found": "Não encontrada",
+      "suspicious": "Suspeita",
+      "processing_error": "Erro"
+    },
+    "confidence_band": {
+      "very_high": "Muito alta",
+      "high": "Alta",
+      "medium": "Média",
+      "low": "Baixa",
+      "very_low": "Muito baixa"
+    },
+    "reason_code": {
+      "exact_doi_match": "Correspondência exata de DOI",
+      "strong_metadata_match": "Correspondência forte de metadados",
+      "weak_metadata_match": "Correspondência fraca de metadados",
+      "cross_source_conflict": "Conflito entre fontes",
+      "doi_conflict": "Conflito de DOI",
+      "ambiguous_multi_candidate": "Múltiplos candidatos possíveis",
+      "no_match_any_source": "Sem correspondência em nenhuma fonte",
+      "suspicious_patterns": "Padrões suspeitos detectados",
+      "processing_error": "Erro de processamento"
+    },
+    "match_type": {
+      "doi_exact": "DOI (exato)",
+      "title_fuzzy": "Título (aproximado)",
+      "identifier_exact": "Identificador (exato)",
+      "issn_filter": "Filtro ISSN",
+      "author_title": "Título + autor"
+    },
+    "no_candidates": "Nenhum candidato encontrado em nenhuma fonte.",
+    "no_references": "Nenhuma referência encontrada.",
+    "export": {
+      "csv": "Exportar CSV",
+      "pdf": "Exportar PDF",
+      "generating": "Gerando...",
+      "csv_aria": "Exportar resultados como CSV",
+      "pdf_aria": "Exportar resultados como PDF",
+      "error": "Erro ao exportar. Tente novamente."
+    },
+    "score": {
+      "title": "Pontuação de autenticidade",
+      "high": "Alta autenticidade",
+      "medium": "Requer revisão",
+      "low": "Baixa autenticidade"
+    },
+    "pdf": {
+      "title": "Relatório de análise de referências bibliográficas",
+      "disclaimer": "Este relatório foi gerado automaticamente. Os resultados devem ser verificados manualmente para decisões críticas.",
+      "summary": "Resumo",
+      "references": "Detalhes das referências",
+      "evidence": "Evidência",
+      "noEvidence": "Nenhuma evidência encontrada",
+      "notAvailable": "N/D",
+      "page": "Página {current} de {total}"
+    },
+    "share": {
+      "button": "Compartilhar",
+      "copied": "Link copiado!",
+      "ready": "Link pronto",
+      "error": "Não foi possível gerar o link",
+      "generating": "Gerando...",
+      "expired": "Compartilhamento expirado (token válido por 1 hora após o envio)"
+    }
+  },
+  "errors": {
+    "storage_full": "Armazenamento cheio. Remova tarefas antigas para continuar.",
+    "storage_corrupted": "Não foi possível carregar o histórico. Os dados podem estar corrompidos.",
+    "upload_failed": "Falha no envio. Por favor, tente novamente.",
+    "analysis_start_failed": "Não foi possível iniciar a análise. Por favor, tente novamente.",
+    "status_fetch_failed": "Não foi possível atualizar o status da tarefa.",
+    "network_error": "Erro de rede. Verifique sua conexão e tente novamente.",
+    "invalid_results_format": "O formato dos resultados é inválido ou não suportado.",
+    "pdf_generation_failed": "Falha ao gerar o PDF. Por favor, tente novamente."
+  },
+  "sharePage": {
+    "title": "Relatório de análise compartilhado",
+    "notFound": "Esta análise compartilhada não foi encontrada ou expirou",
+    "resultError": "Os resultados não puderam ser carregados",
+    "tryBiblio": "Experimente o Biblio Checker",
+    "poweredBy": "Desenvolvido por Biblio Checker",
+    "expiresOn": "Este link expira em {date}",
+    "loading": "Carregando análise compartilhada..."
+  },
+  "landing": {
+    "hero": {
+      "eyebrow": "Integridade acadêmica, verificada",
+      "title": "Detecte referências acadêmicas fabricadas",
+      "subtitle": "Documentos gerados por IA frequentemente contêm citações plausíveis mas inexistentes. O Biblio Checker verifica cada referência em bancos de dados acadêmicos confiáveis.",
+      "cta_primary": "Experimentar agora",
+      "cta_secondary": "Ver demo com exemplo",
+      "socialProof": "Verificado contra OpenAlex, SciELO, arXiv"
+    },
+    "problem": {
+      "title": "O problema das referências falsas",
+      "subtitle": "Por que esta ferramenta existe",
+      "fact1": {
+        "title": "A IA fabrica citações plausíveis",
+        "desc": "Modelos de linguagem geram rotineiramente referências realistas a artigos e autores que não existem."
+      },
+      "fact2": {
+        "title": "A verificação manual leva horas",
+        "desc": "Verificar dezenas de referências em múltiplos bancos de dados é lento e propenso a erros. Revisores frequentemente pulam esta etapa."
+      },
+      "fact3": {
+        "title": "Citações falsas passam pela revisão",
+        "desc": "Referências fabricadas não detectadas comprometem a integridade acadêmica e erodem a confiança."
+      }
+    },
+    "howItWorks": {
+      "title": "Como funciona",
+      "step1": {
+        "title": "Envie seu documento",
+        "desc": "Arraste um arquivo PDF ou DOCX com bibliografia. Sem necessidade de conta."
+      },
+      "step2": {
+        "title": "Verificamos cada referência",
+        "desc": "Cada citação é verificada em paralelo contra OpenAlex, SciELO e arXiv."
+      },
+      "step3": {
+        "title": "Veja a pontuação de autenticidade e a evidência",
+        "desc": "Uma pontuação clara de 0-100 com veredictos por referência, evidência e um relatório compartilhável."
+      }
+    },
+    "demo": {
+      "title": "Isto é o que você recebe",
+      "subtitle": "Uma pontuação real de um documento com referências mistas",
+      "caption": "Análise de exemplo"
+    },
+    "useCases": {
+      "title": "Feito para seu fluxo de trabalho",
+      "professor": {
+        "title": "Professores e revisores",
+        "desc": "Valide bibliografias de alunos e submissões de pares em segundos. Compartilhe um link com o autor para discutir os resultados."
+      },
+      "student": {
+        "title": "Estudantes e pesquisadores",
+        "desc": "Verifique suas citações antes de enviar. Detecte referências fabricadas ou mal atribuídas no seu rascunho."
+      },
+      "institution": {
+        "title": "Instituições",
+        "desc": "Integrações com LMS e processamento em lote para departamentos acadêmicos. Acesso via API para fluxos automatizados."
+      },
+      "comingSoon": "Em breve"
+    },
+    "sources": {
+      "title": "Verificado contra fontes confiáveis",
+      "subtitle": "Verificamos suas referências em paralelo contra os principais bancos de dados acadêmicos abertos.",
+      "openalex": {
+        "desc": "Índice acadêmico global"
+      },
+      "scielo": {
+        "desc": "Revistas latino-americanas"
+      },
+      "arxiv": {
+        "desc": "Preprints em ciências"
+      },
+      "openlibrary": {
+        "desc": "Livros e publicações"
+      }
+    },
+    "cta": {
+      "title": "Pronto para verificar sua bibliografia?",
+      "subtitle": "Sem necessidade de conta. Resultados em menos de um minuto."
+    },
+    "footer": {
+      "product": "Produto",
+      "resources": "Recursos",
+      "home": "Início",
+      "app": "Aplicativo",
+      "github": "GitHub",
+      "docs": "Documentação",
+      "about": "Sobre",
+      "copyright": "© 2026 Biblio Checker"
+    }
+  }
+}

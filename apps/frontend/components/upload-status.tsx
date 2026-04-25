@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { UploadState } from "@/lib/schemas/upload";
 
@@ -9,6 +10,8 @@ interface UploadStatusProps {
 }
 
 export function UploadStatus({ state }: UploadStatusProps) {
+  const t = useTranslations("upload");
+
   if (state.status === "idle") return null;
 
   return (
@@ -17,7 +20,7 @@ export function UploadStatus({ state }: UploadStatusProps) {
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-muted">
             <Loader2 className="h-4 w-4 animate-spin text-accent" />
-            <span>Uploading {state.fileName}...</span>
+            <span>{t("uploading", { fileName: state.fileName ?? "" })}</span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-border">
             <div
@@ -41,7 +44,7 @@ export function UploadStatus({ state }: UploadStatusProps) {
         >
           <CheckCircle2 className="h-5 w-5 shrink-0" />
           <span className="text-sm">
-            File uploaded successfully.
+            {t("upload_success")}
           </span>
         </div>
       )}

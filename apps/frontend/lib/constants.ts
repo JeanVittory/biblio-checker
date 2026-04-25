@@ -67,6 +67,21 @@ export const ERROR_MESSAGES = {
   SERVER_ERROR: "An unexpected server error occurred.",
 } as const;
 
+/**
+ * Translation keys for user-facing error messages.
+ * Consume via `t(ERROR_KEYS.FOO)` at the call site — never resolve here.
+ */
+export const ERROR_KEYS = {
+  FILE_TOO_LARGE: "dropzone.validation_file_too_large",
+  UNSUPPORTED_FORMAT: "dropzone.validation_unsupported_format",
+  UPLOAD_FAILED: "errors.upload_failed",
+  ANALYSIS_START_FAILED: "errors.analysis_start_failed",
+  NETWORK_ERROR: "errors.network_error",
+  INVALID_RESULTS_FORMAT: "errors.invalid_results_format",
+} as const;
+
+export type ErrorKey = (typeof ERROR_KEYS)[keyof typeof ERROR_KEYS];
+
 export enum API_ROUTES {
   SIGNED_UPLOAD = "/api/signed-upload",
   ANALYSIS_START_GATEWAY = "/api/analysis-start-gateway",
@@ -85,3 +100,10 @@ export enum ENDPOINT_ACTION_TYPES {
   DELETE = "DELETE",
   PATCH = "PATCH",
 }
+
+/**
+ * Hardcoded path to the sample PDF served from the public directory.
+ * MUST remain a compile-time literal — never derive this from user input
+ * or query parameters, to prevent SSRF risk.
+ */
+export const SAMPLE_DOCUMENT_PATH = "/samples/sample-references.pdf" as const;

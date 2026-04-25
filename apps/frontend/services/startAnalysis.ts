@@ -3,11 +3,16 @@ import { BibliographyCheckFullPayload } from "@/lib/schemas/bibliographyCheck";
 
 export const startAnalysisService = async (
   backendUrl: string,
-  request: BibliographyCheckFullPayload
+  request: BibliographyCheckFullPayload & { locale?: string },
+  acceptLanguage?: string
 ) => {
+  const headers: Record<string, string> = { "content-type": MIME_TYPES.JSON };
+  if (acceptLanguage) {
+    headers["accept-language"] = acceptLanguage;
+  }
   const checkResponse = await fetch(`${backendUrl}${BACKEND_ROUTES.ANALYSIS_START}`, {
     method: ENDPOINT_ACTION_TYPES.POST,
-    headers: { "content-type": MIME_TYPES.JSON },
+    headers,
     body: JSON.stringify(request),
   });
   return checkResponse;

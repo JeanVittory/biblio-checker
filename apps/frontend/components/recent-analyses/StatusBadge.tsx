@@ -1,4 +1,7 @@
+"use client";
+
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { JobStatus } from "@/lib/localStorage/recentAnalyses";
 
@@ -6,14 +9,24 @@ export interface StatusBadgeProps {
   status: JobStatus;
 }
 
+const STATUS_TO_KEY: Record<JobStatus, string> = {
+  queued: "status.queued",
+  running: "status.running",
+  succeeded: "status.succeeded",
+  failed: "status.failed",
+  expired: "status.expired",
+};
+
 export function StatusBadge({ status }: StatusBadgeProps) {
+  const t = useTranslations();
+  const label = t(STATUS_TO_KEY[status] as Parameters<typeof t>[0]);
   const base = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium";
 
   switch (status) {
     case "queued":
       return (
         <span
-          aria-label="queued"
+          aria-label={label}
           className={cn(base, "bg-amber-500/15 text-amber-500 border border-amber-500/30")}
         >
           <svg
@@ -31,23 +44,23 @@ export function StatusBadge({ status }: StatusBadgeProps) {
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          Queued
+          {label}
         </span>
       );
     case "running":
       return (
         <span
-          aria-label="running"
+          aria-label={label}
           className={cn(base, "bg-blue-500/15 text-blue-400 border border-blue-500/30")}
         >
           <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          Running
+          {label}
         </span>
       );
     case "succeeded":
       return (
         <span
-          aria-label="succeeded"
+          aria-label={label}
           className={cn(base, "bg-green-500/15 text-green-400 border border-green-500/30")}
         >
           <svg
@@ -64,13 +77,13 @@ export function StatusBadge({ status }: StatusBadgeProps) {
           >
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          Succeeded
+          {label}
         </span>
       );
     case "failed":
       return (
         <span
-          aria-label="failed"
+          aria-label={label}
           className={cn(base, "bg-red-500/15 text-red-400 border border-red-500/30")}
         >
           <svg
@@ -88,13 +101,13 @@ export function StatusBadge({ status }: StatusBadgeProps) {
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-          Failed
+          {label}
         </span>
       );
     case "expired":
       return (
         <span
-          aria-label="expired"
+          aria-label={label}
           className={cn(base, "bg-surface text-muted border border-border")}
         >
           <svg
@@ -113,7 +126,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
-          Expired
+          {label}
         </span>
       );
   }

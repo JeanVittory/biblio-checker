@@ -156,7 +156,7 @@ const warningSchema = z.object({
 
 export const resultsV1Schema = z.object({
   schemaVersion: z.literal("1.0"),
-  reportLanguage: z.literal("es"),
+  reportLanguage: z.enum(["es", "pt", "en"]),
   pipeline: z.object({
     name: z.string(),
     version: z.string(),
