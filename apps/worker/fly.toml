@@ -1,0 +1,12 @@
+app = "biblio-worker"
+primary_region = "mia"
+
+[build]
+
+# No http_service: this is a polling worker, not an HTTP server.
+# Auto-stop is disabled implicitly so the polling loop runs 24/7.
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
