@@ -16,7 +16,7 @@ def get_llm() -> BaseChatModel:
     restarting the process.
 
     Raises:
-        ValueError: If ``settings.llm_provider`` is not ``"anthropic"`` or ``"openai"``.
+        ValueError: If ``settings.llm_provider`` is not ``"anthropic"``, ``"openai"``, or ``"groq"``.
     """
     settings = get_settings()
     provider = settings.llm_provider
@@ -39,6 +39,14 @@ def get_llm() -> BaseChatModel:
             model=model,
             temperature=temperature,
             openai_api_key=settings.openai_api_key.get_secret_value(),
+        )
+    elif provider == "groq":
+        from langchain_groq import ChatGroq
+
+        llm = ChatGroq(
+            model=model,
+            temperature=temperature,
+            groq_api_key=settings.groq_api_key.get_secret_value(),
         )
     else:
         raise ValueError(f"Unsupported llm_provider: {provider}")

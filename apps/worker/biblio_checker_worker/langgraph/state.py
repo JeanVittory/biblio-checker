@@ -20,6 +20,13 @@ class GraphState(TypedDict):
     """Document type: ``"pdf"`` or ``"docx"``."""
     file_bytes: bytes
     """Raw document bytes downloaded from Supabase Storage."""
+    locale: str
+    """User-selected locale for decisionReason/warnings rendering.
+    One of ``"es" | "pt" | "en"``. Set at graph invocation; never mutated.
+    Kept as plain ``str`` (not ``Literal``) because TypedDict with Literal
+    aliases interact poorly with runtime dict construction in some LangGraph
+    call sites. ``render()`` normalises invalid values to ``"es"`` at read time.
+    """
 
     # --- After extract_text node ---
     raw_text: str
@@ -53,6 +60,17 @@ class GraphState(TypedDict):
     fan-in completes. Using a plain field (not ``operator.add``) prevents
     double-accumulation since ``classify_results`` runs once, not in parallel.
     Each dict: verified_reference enriched with classification fields.
+    """
+
+    # --- After analyze_cross_patterns node ---
+    cross_reference_analysis: dict
+    """Cross-reference pattern analysis results. Written once by
+    ``analyze_cross_patterns`` (Phase C implementation). Plain field with NO
+    reducer — written by a single node, not accumulated from parallel calls.
+
+    Access via ``state.get("cross_reference_analysis", {})`` — never via direct
+    key access — because the field may be absent when cross-pattern analysis is
+    disabled.
     """
 
     # --- Accumulated across all nodes ---

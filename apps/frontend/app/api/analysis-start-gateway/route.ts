@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { cookies } from "next/headers";
 import { getSupabaseAdminClient } from "@/lib/supabase/supabaseAdmin";
 import { cleanupUploadedFile } from "@/lib/server/storageCleanup";
 import {
@@ -10,6 +11,7 @@ import {
 import { routeEnvSchema } from "@/lib/schemas/env";
 import { ERROR_MESSAGES, HTTP_STATUS } from "@/lib/constants";
 import { startAnalysisService } from "@/services/startAnalysis";
+import { LOCALE_COOKIE, normalizeLocale } from "@/i18n/config";
 
 export const runtime = "nodejs";
 
@@ -17,7 +19,17 @@ export async function POST(request: Request) {
   let cleanupTarget: { bucket: string; path: string } | null = null;
   try {
     const env = routeEnvSchema.parse(process.env);
-    const payload = bibliographyCheckBaseSchema.parse(await request.json());
+
+    // Resolve locale from cookie — this is the source of truth, overriding any
+    // client-supplied locale in the body to prevent desynchronisation.
+    const cookieStore = await cookies();
+    const localeFromCookie = cookieStore.get(LOCALE_COOKIE)?.value ?? null;
+    const locale = normalizeLocale(localeFromCookie);
+
+    const rawBody = await request.json();
+    // Override any locale the client may have included.
+    const bodyWithLocale = { ...rawBody, locale };
+    const payload = bibliographyCheckBaseSchema.parse(bodyWithLocale);
     cleanupTarget = { bucket: payload.storage.bucket, path: payload.storage.path };
 
     if (payload.storage.bucket !== env.SUPABASE_STORAGE_BUCKET) {
@@ -53,7 +65,12 @@ export async function POST(request: Request) {
     };
 
     const validatedPayload = bibliographyCheckFullSchema.parse(payloadWithIntegrity);
-    const response = await startAnalysisService(env.BIBLIO_BACKEND_CHECK_URL, validatedPayload);
+    const acceptLanguage = request.headers.get("accept-language") ?? "";
+    const response = await startAnalysisService(
+      env.BIBLIO_BACKEND_CHECK_URL,
+      { ...validatedPayload, locale },
+      acceptLanguage
+    );
 
     const analysisResponse = await response.json();
 

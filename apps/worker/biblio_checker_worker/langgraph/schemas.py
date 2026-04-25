@@ -46,25 +46,32 @@ class ReasonCode(StrEnum):
 # ---------------------------------------------------------------------------
 
 _ALLOWED_BANDS: dict[Classification, frozenset[ConfidenceBand | None]] = {
-    Classification.VERIFIED:        frozenset({ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}),
-    Classification.LIKELY_VERIFIED: frozenset({ConfidenceBand.MEDIUM, ConfidenceBand.HIGH}),
-    Classification.AMBIGUOUS:       frozenset({ConfidenceBand.LOW, ConfidenceBand.MEDIUM}),
-    Classification.NOT_FOUND:       frozenset({ConfidenceBand.VERY_LOW, ConfidenceBand.LOW}),
-    Classification.SUSPICIOUS:      frozenset({ConfidenceBand.MEDIUM, ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}),
+    Classification.VERIFIED: frozenset({ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}),
+    Classification.LIKELY_VERIFIED: frozenset(
+        {ConfidenceBand.MEDIUM, ConfidenceBand.HIGH}
+    ),
+    Classification.AMBIGUOUS: frozenset({ConfidenceBand.LOW, ConfidenceBand.MEDIUM}),
+    Classification.NOT_FOUND: frozenset({ConfidenceBand.VERY_LOW, ConfidenceBand.LOW}),
+    Classification.SUSPICIOUS: frozenset(
+        {ConfidenceBand.MEDIUM, ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}
+    ),
     Classification.PROCESSING_ERROR: frozenset({None}),
 }
 
-_REQUIRED_MANUAL_REVIEW: frozenset[Classification] = frozenset({
-    Classification.AMBIGUOUS,
-    Classification.NOT_FOUND,
-    Classification.SUSPICIOUS,
-    Classification.PROCESSING_ERROR,
-})
+_REQUIRED_MANUAL_REVIEW: frozenset[Classification] = frozenset(
+    {
+        Classification.AMBIGUOUS,
+        Classification.NOT_FOUND,
+        Classification.SUSPICIOUS,
+        Classification.PROCESSING_ERROR,
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Sub-models
 # ---------------------------------------------------------------------------
+
 
 class NormalizedReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -180,11 +187,12 @@ class ReferenceResult(BaseModel):
 # Root model
 # ---------------------------------------------------------------------------
 
+
 class ResultsV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schemaVersion: str = Field(..., pattern=r"^1\.0$")
-    reportLanguage: str = Field(..., pattern=r"^es$")
+    reportLanguage: str = Field(..., pattern=r"^(es|pt|en)$")
     pipeline: Pipeline
     summary: Summary
     references: list[ReferenceResult]
@@ -238,15 +246,17 @@ class ResultsV1(BaseModel):
 # Internal graph models
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class MatchCandidate:
     """Standardized result from any external API search."""
-    source: str          # "openalex" | "scielo" | "arxiv"
-    external_id: str     # Source-specific identifier
+
+    source: str  # "openalex" | "scielo" | "arxiv"
+    external_id: str  # Source-specific identifier
     title: str | None
     authors: list[str]
     year: int | None
     doi: str | None
     url: str | None
-    match_type: str      # "doi_exact" | "title_fuzzy" | "identifier_exact" | "metadata_partial" | "issn_filter"
-    raw_score: float     # 0.0-1.0, source-specific similarity score
+    match_type: str  # "doi_exact" | "title_fuzzy" | "identifier_exact" | "metadata_partial" | "issn_filter"
+    raw_score: float  # 0.0-1.0, source-specific similarity score

@@ -1,0 +1,9 @@
+node_modules
+.pnpm-store
+.git
+.next
+__pycache__
+*.pyc
+.venv
+.pytest_cache
+.ruff_cache

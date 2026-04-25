@@ -13,6 +13,7 @@ Test matrix:
   5. LLM returns no references — valid empty ResultsV1
   6. ResultsV1 Pydantic validation — output validates against the model
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -218,15 +219,9 @@ def _invoke_with_node_patches(
             side_effect=_get_llm_factory,
         ),
         # Patch API clients
-        patch(
-            "biblio_checker_worker.langgraph.nodes.verify.OpenAlexClient"
-        ) as mock_oa,
-        patch(
-            "biblio_checker_worker.langgraph.nodes.verify.ScieloClient"
-        ) as mock_sc,
-        patch(
-            "biblio_checker_worker.langgraph.nodes.verify.ArxivClient"
-        ) as mock_ar,
+        patch("biblio_checker_worker.langgraph.nodes.verify.OpenAlexClient") as mock_oa,
+        patch("biblio_checker_worker.langgraph.nodes.verify.ScieloClient") as mock_sc,
+        patch("biblio_checker_worker.langgraph.nodes.verify.ArxivClient") as mock_ar,
         # Patch lease renewal so tests don't need Supabase
         patch(
             "biblio_checker_worker.langgraph.nodes.verify.renew_lease_if_needed",

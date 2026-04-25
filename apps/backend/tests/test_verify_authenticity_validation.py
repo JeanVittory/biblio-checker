@@ -22,10 +22,7 @@ VALID_PAYLOAD = {
     "storage": {
         "provider": "supabase",
         "bucket": "uploads",
-        "path": (
-            "uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/"
-            "dummy.pdf"
-        ),
+        "path": ("uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/dummy.pdf"),
     },
     "integrity": {
         "sha256": DUMMY_SHA256,
@@ -57,12 +54,15 @@ async def _post(payload: dict):
 
 @pytest.mark.anyio
 async def test_happy_path():
-    with patch(
-        "app.api.controllers.analysis.start.download_object_bytes",
-        new=AsyncMock(return_value=DUMMY_CONTENT),
-    ), patch(
-        "app.api.controllers.analysis.start.create_analysis_job",
-        new=AsyncMock(return_value={"id": DUMMY_JOB_ID}),
+    with (
+        patch(
+            "app.api.controllers.analysis.start.download_object_bytes",
+            new=AsyncMock(return_value=DUMMY_CONTENT),
+        ),
+        patch(
+            "app.api.controllers.analysis.start.create_analysis_job",
+            new=AsyncMock(return_value={"id": DUMMY_JOB_ID}),
+        ),
     ):
         resp = await _post(VALID_PAYLOAD)
     assert resp.status_code == 200
@@ -124,12 +124,7 @@ async def test_path_traversal_rejected():
 @pytest.mark.anyio
 async def test_absolute_path_rejected():
     payload = _payload(
-        **{
-            "storage.path": (
-                "/uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/"
-                "dummy.pdf"
-            )
-        }
+        **{"storage.path": ("/uploads/4806aa68-ed88-4205-ae86-cc085eb463fd/dummy.pdf")}
     )
     resp = await _post(payload)
     assert resp.status_code == 422
@@ -138,9 +133,7 @@ async def test_absolute_path_rejected():
 @pytest.mark.anyio
 async def test_backslash_in_path_rejected():
     payload = _payload(
-        **{
-            "storage.path": "uploads\\4806aa68-ed88-4205-ae86-cc085eb463fd\\file.pdf"
-        }
+        **{"storage.path": "uploads\\4806aa68-ed88-4205-ae86-cc085eb463fd\\file.pdf"}
     )
     resp = await _post(payload)
     assert resp.status_code == 422
@@ -156,12 +149,7 @@ async def test_null_byte_in_path_rejected():
 @pytest.mark.anyio
 async def test_request_id_not_in_path():
     payload = _payload(
-        **{
-            "storage.path": (
-                "uploads/00000000-0000-0000-0000-000000000000/"
-                "dummy.pdf"
-            )
-        }
+        **{"storage.path": ("uploads/00000000-0000-0000-0000-000000000000/dummy.pdf")}
     )
     resp = await _post(payload)
     assert resp.status_code == 422

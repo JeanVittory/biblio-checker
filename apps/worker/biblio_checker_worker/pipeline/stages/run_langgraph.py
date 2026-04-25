@@ -37,7 +37,9 @@ def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
 
     # Step 2: Execute the flow.
     try:
-        result = start_analysis_flow(job=ctx.job, file_bytes=ctx.file_bytes, supabase=supabase)
+        result = start_analysis_flow(
+            job=ctx.job, file_bytes=ctx.file_bytes, supabase=supabase
+        )
     except Exception as exc:  # noqa: BLE001
         logger.exception("langgraph_flow_exception")
         raise StageError(

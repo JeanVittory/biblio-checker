@@ -311,7 +311,9 @@ def renew_lease(
         if renewed:
             logger.debug("lease_renewed", job_id=job_id)
         else:
-            logger.warning("lease_renewal_failed", job_id=job_id, error="rpc returned false")
+            logger.warning(
+                "lease_renewal_failed", job_id=job_id, error="rpc returned false"
+            )
         return renewed
     except Exception as exc:  # noqa: BLE001
         logger.warning(

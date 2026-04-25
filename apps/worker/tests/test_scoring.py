@@ -13,6 +13,7 @@ from biblio_checker_worker.langgraph.scoring import (
 # title_similarity
 # ---------------------------------------------------------------------------
 
+
 class TestTitleSimilarity:
     def test_identical_titles_return_1_0(self) -> None:
         assert title_similarity("Deep Learning", "Deep Learning") == pytest.approx(1.0)
@@ -70,6 +71,7 @@ class TestTitleSimilarity:
 # ---------------------------------------------------------------------------
 # author_similarity
 # ---------------------------------------------------------------------------
+
 
 class TestAuthorSimilarity:
     def test_empty_list_a_returns_0(self) -> None:
@@ -143,6 +145,7 @@ class TestAuthorSimilarity:
 # compute_match_score
 # ---------------------------------------------------------------------------
 
+
 class TestComputeMatchScore:
     def test_identical_metadata_returns_high_score(self) -> None:
         score = compute_match_score(
@@ -214,9 +217,9 @@ class TestComputeMatchScore:
             candidate_authors=["Author"],
             candidate_year=2021,
         )
-        # Difference should be approximately 0.15 * 0.5 = 0.075
+        # Difference should be approximately 0.15 * (1.0 - 0.8) = 0.03
         assert score_exact > score_off
-        assert abs(score_exact - score_off - 0.075) < 0.01
+        assert abs(score_exact - score_off - 0.03) < 0.01
 
     def test_none_year_contributes_zero(self) -> None:
         score_with_year = compute_match_score(

@@ -4,6 +4,7 @@ Mocks API clients and the lease renewal module so tests run without network
 access. Covers: all sources succeed, one source fails, all sources fail,
 no candidates found, and score computation for non-exact matches.
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -17,6 +18,7 @@ from biblio_checker_worker.langgraph.schemas import MatchCandidate
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_candidate(
     *,
@@ -86,6 +88,7 @@ def _make_state(
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _patch_lease(monkeypatch: pytest.MonkeyPatch) -> None:
     """Prevent actual lease renewal during tests."""
@@ -110,6 +113,7 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------
 # Test: all sources succeed
 # ---------------------------------------------------------------------------
+
 
 class TestAllSourcesSucceed:
     def test_returns_verified_references_list(self) -> None:
@@ -218,6 +222,7 @@ class TestAllSourcesSucceed:
 # Test: score computation applied to non-exact matches
 # ---------------------------------------------------------------------------
 
+
 class TestScoreComputation:
     def test_raw_score_computed_for_title_fuzzy_candidates(self) -> None:
         """Non-exact-match candidates must have raw_score set by compute_match_score."""
@@ -309,6 +314,7 @@ class TestScoreComputation:
 # Test: one source fails, others continue
 # ---------------------------------------------------------------------------
 
+
 class TestOneSourceFails:
     def test_openalex_fails_others_continue(self) -> None:
         scielo_cand = _make_candidate(source="scielo", match_type="title_fuzzy")
@@ -348,9 +354,7 @@ class TestOneSourceFails:
         assert "openalex" in verified["source_errors"]
         assert verified["source_errors"]["openalex"] == "unexpected_error"
         # Warning emitted for the failed source
-        assert any(
-            w["code"] == "source_timeout_partial" for w in result["warnings"]
-        )
+        assert any(w["code"] == "source_timeout_partial" for w in result["warnings"])
 
     def test_timeout_error_records_sanitized_message(self) -> None:
         import httpx
@@ -427,6 +431,7 @@ class TestOneSourceFails:
 # ---------------------------------------------------------------------------
 # Test: all sources fail → processing_error
 # ---------------------------------------------------------------------------
+
 
 class TestAllSourcesFail:
     def test_all_sources_raise_does_not_raise(self) -> None:
@@ -516,6 +521,7 @@ class TestAllSourcesFail:
 # Test: new fields forwarded to client.search()
 # ---------------------------------------------------------------------------
 
+
 class TestNewFieldsForwarded:
     def test_issn_volume_issue_pages_publisher_passed_to_search(self) -> None:
         """All five new normalized fields must be forwarded via client.search() kwargs."""
@@ -571,7 +577,9 @@ class TestNewFieldsForwarded:
         mock_arxiv = MagicMock()
         mock_arxiv.search.return_value = []
 
-        state = _make_state(issn=None, volume=None, issue=None, pages=None, publisher=None)
+        state = _make_state(
+            issn=None, volume=None, issue=None, pages=None, publisher=None
+        )
 
         with (
             patch(
@@ -605,6 +613,7 @@ class TestNewFieldsForwarded:
 # ---------------------------------------------------------------------------
 # Test: no candidates found
 # ---------------------------------------------------------------------------
+
 
 class TestNoCandidatesFound:
     def test_no_candidates_returns_empty_candidates_list(self) -> None:

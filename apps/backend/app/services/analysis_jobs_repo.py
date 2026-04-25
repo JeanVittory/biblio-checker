@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -97,8 +98,10 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
         resp = (
             supabase.table("analysis_jobs")
             .select(
-                "id, status, stage, results, error, created_at, completed_at,"
-                " poll_status_token, poll_status_token_expires_at"
+                "id, status, stage, result_json, error_code, error_detail,"
+                " created_at, completed_at,"
+                " poll_status_token, poll_status_token_expires_at,"
+                " share_token, share_token_expires_at"
             )
             .eq("id", job_id)
             .limit(1)
@@ -160,4 +163,170 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
         )
         raise AnalysisJobsRepoError(
             code="analysis_job_fetch_failed", detail=str(exc) or None
+        ) from exc
+
+
+async def get_analysis_job_by_share_token(
+    share_token: str,
+) -> dict[str, Any] | None:
+    """Fetch a single analysis_jobs row by share_token.
+
+    Returns a restricted dict (MUST NOT include poll_status_token, job_token,
+    bucket, path, or sha256) or None when no row matches the token.
+    Raises AnalysisJobsRepoError on any DB / client error.
+    """
+    try:
+        supabase = get_supabase_admin_client()
+    except SupabaseClientError as exc:
+        raise AnalysisJobsRepoError(code=exc.code, detail=exc.detail) from exc
+
+    def _select_sync() -> dict[str, Any] | None:
+        resp = (
+            supabase.table("analysis_jobs")
+            .select(
+                "id, status, stage, result_json, error_code, error_detail,"
+                " created_at, completed_at,"
+                " share_token, share_token_expires_at"
+            )
+            .eq("share_token", share_token)
+            .limit(1)
+            .execute()
+        )
+        data = getattr(resp, "data", None)
+        if not isinstance(data, list):
+            raise AnalysisJobsRepoError(
+                code="analysis_job_fetch_failed",
+                detail="DB select returned an unexpected response.",
+            )
+        if not data:
+            return None
+        if not isinstance(data[0], dict):
+            raise AnalysisJobsRepoError(
+                code="analysis_job_fetch_failed",
+                detail="DB select returned an unexpected row representation.",
+            )
+        return dict(data[0])
+
+    logger.info("analysis_job_fetching_by_share_token")
+    try:
+        result = await run_sync(_select_sync)
+        logger.info(
+            "analysis_job_fetched_by_share_token",
+            found=result is not None,
+        )
+        return result
+    except AnalysisJobsRepoError as exc:
+        logger.error(
+            "analysis_job_fetch_by_share_token_failed",
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
+        raise
+    except APIError as exc:
+        code = str(exc.code or "").strip()
+        is_auth_err = code in ("401", "403")
+        err_code = "db_unauthorized" if is_auth_err else "analysis_job_fetch_failed"
+        logger.error(
+            "analysis_job_fetch_by_share_token_failed",
+            error_code=err_code,
+            error_detail=str(exc),
+        )
+        if is_auth_err:
+            raise AnalysisJobsRepoError(
+                code="db_unauthorized",
+                detail=str(exc),
+            ) from exc
+        raise AnalysisJobsRepoError(
+            code="analysis_job_fetch_failed", detail=str(exc) or None
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "analysis_job_fetch_by_share_token_failed",
+            error_code="analysis_job_fetch_failed",
+            error_detail=str(exc),
+        )
+        raise AnalysisJobsRepoError(
+            code="analysis_job_fetch_failed", detail=str(exc) or None
+        ) from exc
+
+
+async def update_share_token(
+    job_id: str,
+    share_token: str,
+    expires_at: datetime,
+) -> bool:
+    """Update share_token and share_token_expires_at on an analysis_jobs row.
+
+    Returns True if the row was found and updated, False if no row with
+    that id exists.  Raises AnalysisJobsRepoError on DB / client errors.
+    """
+    try:
+        supabase = get_supabase_admin_client()
+    except SupabaseClientError as exc:
+        raise AnalysisJobsRepoError(code=exc.code, detail=exc.detail) from exc
+
+    def _update_sync() -> bool:
+        resp = (
+            supabase.table("analysis_jobs")
+            .update(
+                {
+                    "share_token": share_token,
+                    "share_token_expires_at": expires_at.isoformat(),
+                }
+            )
+            .eq("id", job_id)
+            .execute()
+        )
+        data = getattr(resp, "data", None)
+        if not isinstance(data, list):
+            raise AnalysisJobsRepoError(
+                code="analysis_job_update_failed",
+                detail="DB update returned an unexpected response.",
+            )
+        return len(data) > 0
+
+    logger.info("analysis_job_share_token_updating", job_id=job_id)
+    try:
+        updated = await run_sync(_update_sync)
+        logger.info(
+            "analysis_job_share_token_updated",
+            job_id=job_id,
+            updated=updated,
+        )
+        return updated
+    except AnalysisJobsRepoError as exc:
+        logger.error(
+            "analysis_job_share_token_update_failed",
+            job_id=job_id,
+            error_code=exc.code,
+            error_detail=exc.detail,
+        )
+        raise
+    except APIError as exc:
+        code = str(exc.code or "").strip()
+        is_auth_err = code in ("401", "403")
+        err_code = "db_unauthorized" if is_auth_err else "analysis_job_update_failed"
+        logger.error(
+            "analysis_job_share_token_update_failed",
+            job_id=job_id,
+            error_code=err_code,
+            error_detail=str(exc),
+        )
+        if is_auth_err:
+            raise AnalysisJobsRepoError(
+                code="db_unauthorized",
+                detail=str(exc),
+            ) from exc
+        raise AnalysisJobsRepoError(
+            code="analysis_job_update_failed", detail=str(exc) or None
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "analysis_job_share_token_update_failed",
+            job_id=job_id,
+            error_code="analysis_job_update_failed",
+            error_detail=str(exc),
+        )
+        raise AnalysisJobsRepoError(
+            code="analysis_job_update_failed", detail=str(exc) or None
         ) from exc

@@ -8,6 +8,7 @@ evidence and source error information.
 Classification is NOT applied here — it happens in ``classify_results`` (Step 09)
 after all fan-out invocations complete (fan-in).
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -18,20 +19,55 @@ import structlog
 
 from biblio_checker_worker.core.config import get_settings
 from biblio_checker_worker.langgraph.clients.arxiv import ArxivClient
+from biblio_checker_worker.langgraph.clients.llm import get_llm
 from biblio_checker_worker.langgraph.clients.openalex import OpenAlexClient
+from biblio_checker_worker.langgraph.clients.openlibrary import OpenLibraryClient
 from biblio_checker_worker.langgraph.clients.scielo import ScieloClient
-from biblio_checker_worker.langgraph.schemas import MatchCandidate
-from biblio_checker_worker.langgraph.scoring import compute_match_score
-
+from biblio_checker_worker.langgraph.i18n import render
 from biblio_checker_worker.langgraph.lease import renew_lease_if_needed
-
+from biblio_checker_worker.langgraph.schemas import MatchCandidate
+from biblio_checker_worker.langgraph.scoring import (
+    author_similarity,
+    compute_match_score,
+    title_similarity,
+)
 
 logger = structlog.stdlib.get_logger("biblio_checker_worker.langgraph.nodes.verify")
+
+_TRANSLATION_CHECK_TITLE_THRESHOLD = 0.5
+_TRANSLATION_CHECK_AUTHOR_THRESHOLD = 0.8
+_TRANSLATED_TITLE_SCORE = 0.95
+
+
+def _check_title_translation(title_a: str, title_b: str) -> bool:
+    """Ask the LLM whether two titles are the same work in different languages.
+
+    Only called when author similarity is high but title similarity is low,
+    suggesting a possible cross-language match (e.g. Spanish translation vs
+    English original).
+
+    Returns True if the LLM confirms they are the same work.
+    """
+    prompt = (
+        "Are these two titles the same academic work in different languages? "
+        "Answer ONLY 'YES' or 'NO', nothing else.\n\n"
+        f'Title A: "{title_a}"\n'
+        f'Title B: "{title_b}"'
+    )
+    try:
+        llm = get_llm()
+        response = llm.invoke(prompt)
+        answer = response.content.strip().upper()  # type: ignore[union-attr]
+        return answer.startswith("YES")
+    except Exception:
+        logger.warning("translation_check_failed", title_a=title_a, title_b=title_b)
+        return False
 
 
 # ---------------------------------------------------------------------------
 # Error message sanitization
 # ---------------------------------------------------------------------------
+
 
 def _safe_error_message(exc: Exception) -> str:
     """Return a sanitised, user-facing error description.
@@ -51,6 +87,7 @@ def _safe_error_message(exc: Exception) -> str:
 # ---------------------------------------------------------------------------
 # Node function
 # ---------------------------------------------------------------------------
+
 
 def verify_single_reference(state: dict) -> dict:
     """Verify one reference against all three API sources.
@@ -89,6 +126,7 @@ def verify_single_reference(state: dict) -> dict:
     reference: dict = state["reference"]
     reference_id: str = reference.get("referenceId", "<unknown>")
     normalized: dict = reference.get("normalized", {})
+    locale: str = state.get("locale", "es")
 
     warnings: list[dict] = list(state.get("warnings", []))
 
@@ -109,6 +147,16 @@ def verify_single_reference(state: dict) -> dict:
     scielo = ScieloClient(timeout=settings.api_timeout_seconds)
     arxiv = ArxivClient(timeout=settings.api_timeout_seconds)
 
+    # Detect if the reference is a book (has publisher, no ISSN/volume)
+    is_book = (
+        normalized.get("publisher") is not None
+        and normalized.get("issn") is None
+        and normalized.get("volume") is None
+    )
+    openlibrary: OpenLibraryClient | None = None
+    if is_book:
+        openlibrary = OpenLibraryClient(timeout=settings.api_timeout_seconds)
+
     try:
         # Renew worker lease before potentially slow API calls
         renew_lease_if_needed()
@@ -116,11 +164,15 @@ def verify_single_reference(state: dict) -> dict:
         candidates: list[MatchCandidate] = []
         source_errors: dict[str, str] = {}
 
-        for source_name, client in [
+        sources: list[tuple[str, object]] = [
             ("openalex", openalex),
             ("scielo", scielo),
             ("arxiv", arxiv),
-        ]:
+        ]
+        if openlibrary is not None:
+            sources.append(("openlibrary", openlibrary))
+
+        for source_name, client in sources:
             try:
                 results = client.search(  # type: ignore[union-attr]
                     title=normalized.get("title"),
@@ -147,8 +199,11 @@ def verify_single_reference(state: dict) -> dict:
                 warnings.append(
                     {
                         "code": "source_timeout_partial",
-                        "message": (
-                            f"La fuente {source_name} no respondió correctamente: {safe_msg}"
+                        "message": render(
+                            "warn.source_timeout_partial",
+                            locale,
+                            source_name=source_name,
+                            reason=safe_msg,
                         ),
                         "referenceId": reference_id,
                         "details": None,
@@ -156,17 +211,52 @@ def verify_single_reference(state: dict) -> dict:
                 )
 
         # Compute raw_score for candidates that are not exact matches
+        ref_title = normalized.get("title")
+        ref_authors = normalized.get("authors", [])
+        ref_year = normalized.get("year")
+
         scored_candidates: list[MatchCandidate] = []
         for candidate in candidates:
             if candidate.match_type not in ("doi_exact", "identifier_exact"):
                 score = compute_match_score(
-                    ref_title=normalized.get("title"),
-                    ref_authors=normalized.get("authors", []),
-                    ref_year=normalized.get("year"),
+                    ref_title=ref_title,
+                    ref_authors=ref_authors,
+                    ref_year=ref_year,
                     candidate_title=candidate.title,
                     candidate_authors=candidate.authors,
                     candidate_year=candidate.year,
                 )
+
+                # Translation check: if author matches well but title doesn't,
+                # ask the LLM if they are the same work in different languages.
+                if (
+                    ref_title
+                    and candidate.title
+                    and title_similarity(ref_title, candidate.title)
+                    < _TRANSLATION_CHECK_TITLE_THRESHOLD
+                    and author_similarity(ref_authors, candidate.authors)
+                    >= _TRANSLATION_CHECK_AUTHOR_THRESHOLD
+                ):
+                    logger.info(
+                        "translation_check_triggered",
+                        reference_id=reference_id,
+                        ref_title=ref_title,
+                        candidate_title=candidate.title,
+                    )
+                    if _check_title_translation(ref_title, candidate.title):
+                        logger.info(
+                            "translation_confirmed",
+                            reference_id=reference_id,
+                        )
+                        score = compute_match_score(
+                            ref_title=ref_title,
+                            ref_authors=ref_authors,
+                            ref_year=ref_year,
+                            candidate_title=ref_title,  # treat as same title
+                            candidate_authors=candidate.authors,
+                            candidate_year=candidate.year,
+                        )
+
                 candidate = dataclasses.replace(candidate, raw_score=score)
             scored_candidates.append(candidate)
 
@@ -204,7 +294,7 @@ def verify_single_reference(state: dict) -> dict:
                     "confidenceBand": None,
                     "manualReviewRequired": True,
                     "reasonCode": "reference_processing_failure",
-                    "decisionReason": "Ocurrió un error interno al procesar esta referencia.",
+                    "decisionReason": render("class.processing_error", locale),
                     "evidence": [],
                 }
             ],
@@ -212,8 +302,10 @@ def verify_single_reference(state: dict) -> dict:
                 *warnings,
                 {
                     "code": "reference_verification_failed",
-                    "message": (
-                        f"La verificación de la referencia {reference_id} falló completamente."
+                    "message": render(
+                        "warn.reference_verification_failed",
+                        locale,
+                        reason=reference_id,
                     ),
                     "referenceId": reference_id,
                     "details": None,
@@ -225,3 +317,5 @@ def verify_single_reference(state: dict) -> dict:
         openalex.close()
         scielo.close()
         arxiv.close()
+        if openlibrary is not None:
+            openlibrary.close()

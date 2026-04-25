@@ -12,6 +12,7 @@ from app.services.integrity import (
 CONTENT = b"dummy-content"
 CONTENT_SHA256 = hashlib.sha256(CONTENT).hexdigest()
 
+
 def test_verify_sha256_bytes_ok_case_insensitive():
     verify_sha256_bytes(content=CONTENT, sha256=CONTENT_SHA256.upper())
 

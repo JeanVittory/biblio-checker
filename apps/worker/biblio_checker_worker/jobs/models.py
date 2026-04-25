@@ -17,6 +17,7 @@ class AnalysisJob:
     source_type: str
     attempts: int
     max_attempts: int
+    locale: str = "es"
     job_token: str | None = None
     job_token_expires_at: str | None = None
     created_at: str | None = None
@@ -34,6 +35,7 @@ class AnalysisJob:
             "source_type",
             "attempts",
             "max_attempts",
+            "locale",
             "job_token",
             "job_token_expires_at",
             "created_at",
@@ -61,6 +63,8 @@ class AnalysisJob:
             source_type=filtered["source_type"],
             attempts=filtered["attempts"],
             max_attempts=filtered["max_attempts"],
+            locale=filtered.get("locale")
+            or "es",  # defensive default for pre-migration rows
             job_token=filtered.get("job_token"),
             job_token_expires_at=filtered.get("job_token_expires_at"),
             created_at=filtered.get("created_at"),

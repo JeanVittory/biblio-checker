@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useId } from "react";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { useTranslations, useFormatter, useNow } from "next-intl";
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/time";
 import { StatusBadge } from "./StatusBadge";
 import { ExpandedDetail } from "./ExpandedDetail";
 import type { StoredJob } from "@/lib/localStorage/recentAnalyses";
@@ -15,6 +15,9 @@ export interface JobRowProps {
 
 export function JobRow({ job, onRemove }: JobRowProps) {
   const [expanded, setExpanded] = useState(false);
+  const t = useTranslations("recent");
+  const formatter = useFormatter();
+  const now = useNow({ updateInterval: 60_000 });
 
   // Stable IDs for ARIA relationships.
   const baseId = useId();
@@ -41,6 +44,8 @@ export function JobRow({ job, onRemove }: JobRowProps) {
     }
   }, []);
 
+  const relativeTime = formatter.relativeTime(new Date(job.submittedAt), now);
+
   return (
     <tbody>
       <tr
@@ -61,7 +66,7 @@ export function JobRow({ job, onRemove }: JobRowProps) {
         {/* Submitted at */}
         <td className="px-4 py-3 text-sm text-muted whitespace-nowrap">
           <time dateTime={job.submittedAt} title={new Date(job.submittedAt).toLocaleString()}>
-            {formatRelativeTime(job.submittedAt)}
+            {relativeTime}
           </time>
         </td>
 
@@ -79,7 +84,7 @@ export function JobRow({ job, onRemove }: JobRowProps) {
               type="button"
               aria-expanded={expanded}
               aria-controls={panelId}
-              aria-label={expanded ? "Collapse details" : "Expand details"}
+              aria-label={expanded ? t("actions.hide_details") : t("actions.view_details")}
               onClick={handleToggle}
               className={cn(
                 "flex items-center justify-center rounded-md p-1 transition-colors",
@@ -97,7 +102,7 @@ export function JobRow({ job, onRemove }: JobRowProps) {
             {/* Remove button */}
             <button
               type="button"
-              aria-label={`Remove job for ${job.fileName}`}
+              aria-label={t("actions.remove_job")}
               onClick={handleRemove}
               onKeyDown={handleRemoveKeyDown}
               className={cn(

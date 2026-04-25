@@ -23,7 +23,7 @@ _ARXIV_NS = "http://arxiv.org/schemas/atom"
 logger = structlog.stdlib.get_logger("biblio_checker_worker.langgraph.clients.arxiv")
 
 _ARXIV_QUERY_SPECIAL = re.compile(r'["\(\)]')
-_ARXIV_BOOLEAN_PATTERN = re.compile(r'\b(AND|OR|ANDNOT)\b', re.IGNORECASE)
+_ARXIV_BOOLEAN_PATTERN = re.compile(r"\b(AND|OR|ANDNOT)\b", re.IGNORECASE)
 
 
 def _sanitize_arxiv_term(value: str) -> str:
@@ -49,7 +49,9 @@ def _extract_arxiv_id_from_url(url: str) -> str:
     return bare
 
 
-def _parse_entry(entry: ET.Element, match_type: str, raw_score: float) -> MatchCandidate | None:
+def _parse_entry(
+    entry: ET.Element, match_type: str, raw_score: float
+) -> MatchCandidate | None:
     """Parse a single Atom <entry> element into a MatchCandidate."""
     # <id>
     id_el = entry.find(f"{{{_ATOM_NS}}}id")
@@ -98,7 +100,9 @@ def _parse_entry(entry: ET.Element, match_type: str, raw_score: float) -> MatchC
     )
 
 
-def _parse_feed(xml_text: str, match_type: str, raw_score: float) -> list[MatchCandidate]:
+def _parse_feed(
+    xml_text: str, match_type: str, raw_score: float
+) -> list[MatchCandidate]:
     """Parse Atom XML feed returned by arXiv API."""
     try:
         root = ET.fromstring(xml_text)
@@ -113,7 +117,9 @@ def _parse_feed(xml_text: str, match_type: str, raw_score: float) -> list[MatchC
             if candidate is not None:
                 candidates.append(candidate)
         except Exception:
-            logger.warning("search_parse_error", source="arxiv", detail="could not parse entry")
+            logger.warning(
+                "search_parse_error", source="arxiv", detail="could not parse entry"
+            )
             continue
     return candidates
 
@@ -152,31 +158,60 @@ class ArxivClient:
         # Strategy 1: arXiv ID lookup
         if arxiv_id is not None:
             if not _validate_arxiv_id(arxiv_id):
-                logger.debug("search_request", source="arxiv", strategy="id_lookup", skipped=True, reason="invalid_arxiv_id_format")
+                logger.debug(
+                    "search_request",
+                    source="arxiv",
+                    strategy="id_lookup",
+                    skipped=True,
+                    reason="invalid_arxiv_id_format",
+                )
             else:
                 self._throttle()
-                logger.info("search_starting", source="arxiv", strategy="id_lookup", arxiv_id=arxiv_id)
+                logger.info(
+                    "search_starting",
+                    source="arxiv",
+                    strategy="id_lookup",
+                    arxiv_id=arxiv_id,
+                )
                 result = self._id_lookup(arxiv_id)
-                logger.info("search_complete", source="arxiv", candidates_found=len(result))
+                logger.info(
+                    "search_complete", source="arxiv", candidates_found=len(result)
+                )
                 if result:
                     return result
 
         # Strategy 2: DOI search
         if doi is not None:
             if not _validate_doi(doi):
-                logger.debug("search_request", source="arxiv", strategy="doi_search", skipped=True, reason="invalid_doi_format")
+                logger.debug(
+                    "search_request",
+                    source="arxiv",
+                    strategy="doi_search",
+                    skipped=True,
+                    reason="invalid_doi_format",
+                )
             else:
                 self._throttle()
-                logger.info("search_starting", source="arxiv", strategy="doi_search", doi=doi)
+                logger.info(
+                    "search_starting", source="arxiv", strategy="doi_search", doi=doi
+                )
                 result = self._doi_search(doi)
-                logger.info("search_complete", source="arxiv", candidates_found=len(result))
+                logger.info(
+                    "search_complete", source="arxiv", candidates_found=len(result)
+                )
                 if result:
                     return result
 
         # Strategy 3: Title + Author search
         if title is not None and authors:
             self._throttle()
-            logger.info("search_starting", source="arxiv", strategy="title_author_search", title=title, first_author=authors[0])
+            logger.info(
+                "search_starting",
+                source="arxiv",
+                strategy="title_author_search",
+                title=title,
+                first_author=authors[0],
+            )
             result = self._title_author_search(title, authors[0])
             logger.info("search_complete", source="arxiv", candidates_found=len(result))
             if result:
@@ -185,7 +220,9 @@ class ArxivClient:
         # Strategy 4: Title only search
         if title is not None:
             self._throttle()
-            logger.info("search_starting", source="arxiv", strategy="title_search", title=title)
+            logger.info(
+                "search_starting", source="arxiv", strategy="title_search", title=title
+            )
             result = self._title_search(title)
             logger.info("search_complete", source="arxiv", candidates_found=len(result))
             return result
@@ -194,57 +231,109 @@ class ArxivClient:
         return []
 
     def _id_lookup(self, arxiv_id: str) -> list[MatchCandidate]:
-        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"id_list": arxiv_id})
+        logger.debug(
+            "search_request",
+            source="arxiv",
+            url=f"{self._client.base_url}/query",
+            params={"id_list": arxiv_id},
+        )
         response = self._client.get("/query", params={"id_list": arxiv_id})
         if response.status_code == 404:
             return []
         response.raise_for_status()
         try:
-            return _parse_feed(response.text, match_type="identifier_exact", raw_score=1.0)
+            return _parse_feed(
+                response.text, match_type="identifier_exact", raw_score=1.0
+            )
         except ValueError:
-            logger.warning("search_parse_error", source="arxiv", strategy="id_lookup", detail="XML parse error")
+            logger.warning(
+                "search_parse_error",
+                source="arxiv",
+                strategy="id_lookup",
+                detail="XML parse error",
+            )
             return []
 
     def _doi_search(self, doi: str) -> list[MatchCandidate]:
-        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"search_query": f"doi:{doi}", "max_results": 1})
-        response = self._client.get("/query", params={"search_query": f"doi:{doi}", "max_results": 1})
+        logger.debug(
+            "search_request",
+            source="arxiv",
+            url=f"{self._client.base_url}/query",
+            params={"search_query": f"doi:{doi}", "max_results": 1},
+        )
+        response = self._client.get(
+            "/query", params={"search_query": f"doi:{doi}", "max_results": 1}
+        )
         if response.status_code == 404:
             return []
         response.raise_for_status()
         try:
             return _parse_feed(response.text, match_type="doi_exact", raw_score=1.0)
         except ValueError:
-            logger.warning("search_parse_error", source="arxiv", strategy="doi_search", detail="XML parse error")
+            logger.warning(
+                "search_parse_error",
+                source="arxiv",
+                strategy="doi_search",
+                detail="XML parse error",
+            )
             return []
 
-    def _title_author_search(self, title: str, first_author: str) -> list[MatchCandidate]:
+    def _title_author_search(
+        self, title: str, first_author: str
+    ) -> list[MatchCandidate]:
         """Search by combined title and first author surname."""
         surname = self._extract_surname(first_author[:128])
         safe_title = _sanitize_arxiv_term(title[:500])
         safe_surname = _sanitize_arxiv_term(surname)
         search_query = f'ti:"{safe_title}" AND au:{safe_surname}'
-        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"search_query": search_query, "max_results": 5})
-        response = self._client.get("/query", params={"search_query": search_query, "max_results": 5})
+        logger.debug(
+            "search_request",
+            source="arxiv",
+            url=f"{self._client.base_url}/query",
+            params={"search_query": search_query, "max_results": 5},
+        )
+        response = self._client.get(
+            "/query", params={"search_query": search_query, "max_results": 5}
+        )
         if response.status_code == 404:
             return []
         response.raise_for_status()
         try:
-            return _parse_feed(response.text, match_type="metadata_partial", raw_score=0.0)
+            return _parse_feed(
+                response.text, match_type="metadata_partial", raw_score=0.0
+            )
         except ValueError:
-            logger.warning("search_parse_error", source="arxiv", strategy="title_author_search", detail="XML parse error")
+            logger.warning(
+                "search_parse_error",
+                source="arxiv",
+                strategy="title_author_search",
+                detail="XML parse error",
+            )
             return []
 
     def _title_search(self, title: str) -> list[MatchCandidate]:
         safe_title = _sanitize_arxiv_term(title[:500])
-        logger.debug("search_request", source="arxiv", url=f"{self._client.base_url}/query", params={"search_query": f'ti:"{safe_title}"', "max_results": 5})
-        response = self._client.get("/query", params={"search_query": f'ti:"{safe_title}"', "max_results": 5})
+        logger.debug(
+            "search_request",
+            source="arxiv",
+            url=f"{self._client.base_url}/query",
+            params={"search_query": f'ti:"{safe_title}"', "max_results": 5},
+        )
+        response = self._client.get(
+            "/query", params={"search_query": f'ti:"{safe_title}"', "max_results": 5}
+        )
         if response.status_code == 404:
             return []
         response.raise_for_status()
         try:
             return _parse_feed(response.text, match_type="title_fuzzy", raw_score=0.0)
         except ValueError:
-            logger.warning("search_parse_error", source="arxiv", strategy="title_search", detail="XML parse error")
+            logger.warning(
+                "search_parse_error",
+                source="arxiv",
+                strategy="title_search",
+                detail="XML parse error",
+            )
             return []
 
     @staticmethod

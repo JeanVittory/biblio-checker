@@ -8,21 +8,37 @@ Graph topology (deterministic — no LLM-driven routing):
                   └─► normalize_references
                         └─► [fan_out_verify] ──► verify_single_reference (×N, parallel)
                                                         └─► classify_results (fan-in)
-                                                                └─► assemble_report
-                                                                        └─► END
+                                                                └─► analyze_cross_patterns
+                                                                        └─► ai_adjudicate
+                                                                                └─► assemble_report
+                                                                                        └─► END
 
 The fan-out is driven by ``Send()`` — one invocation per normalized reference.
 LangGraph manages concurrency internally; ``settings.max_references`` caps the
 maximum number of simultaneous ``verify_single_reference`` calls.
+
+``analyze_cross_patterns`` runs deterministic pattern checks (venue clusters,
+DOI prefix analysis, self-citation anomaly, temporal impossibility) and an
+optional LLM call for document-level fabrication pattern analysis.
+
+``ai_adjudicate`` applies LLM-as-Judge reasoning to references classified as
+uncertain (ambiguous, not_found, suspicious) by the deterministic rules.
+
+Both new nodes handle their own internal skip logic via feature flags, so all
+new edges are plain deterministic edges (no conditional routing needed).
 """
+
 from __future__ import annotations
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send  # type: ignore[import-untyped]
 
 from biblio_checker_worker.core.config import get_settings
+from biblio_checker_worker.langgraph.i18n import render
+from biblio_checker_worker.langgraph.nodes.ai_adjudicate import ai_adjudicate
 from biblio_checker_worker.langgraph.nodes.assemble import assemble_report
 from biblio_checker_worker.langgraph.nodes.classify import classify_results
+from biblio_checker_worker.langgraph.nodes.cross_patterns import analyze_cross_patterns
 from biblio_checker_worker.langgraph.nodes.extract_text import extract_text
 from biblio_checker_worker.langgraph.nodes.normalize import normalize_references
 from biblio_checker_worker.langgraph.nodes.parse_references import parse_references
@@ -52,6 +68,7 @@ def fan_out_verify(state: GraphState) -> list[Send]:
     """
     settings = get_settings()
     normalized: list[dict] = state.get("normalized_references", [])  # type: ignore[call-overload]
+    locale: str = state.get("locale", "es")  # type: ignore[call-overload]
 
     if not normalized:
         # No references to verify — skip directly to classify_results.
@@ -75,10 +92,11 @@ def fan_out_verify(state: GraphState) -> list[Send]:
         normalized = normalized[: settings.max_references]
         truncation_warning = {
             "code": "references_truncated",
-            "message": (
-                f"El documento excede el límite de {settings.max_references}"
-                f" referencias. Solo se procesaron las primeras"
-                f" {settings.max_references}."
+            "message": render(
+                "warn.references_truncated",
+                locale,
+                total=str(len(normalized_original)),
+                limit=str(settings.max_references),
             ),
             "referenceId": None,
             "details": {
@@ -95,6 +113,7 @@ def fan_out_verify(state: GraphState) -> list[Send]:
                 {
                     "job_id": state["job_id"],
                     "reference": ref,
+                    "locale": locale,
                     "warnings": [],
                     "verified_references": [],
                 },
@@ -119,9 +138,12 @@ def fan_out_verify(state: GraphState) -> list[Send]:
 def build_graph():
     """Construct, wire, and compile the analysis StateGraph.
 
-    Registers all six pipeline nodes and connects them with deterministic edges
-    plus a conditional fan-out edge from ``normalize_references`` that dispatches
-    one ``Send`` per reference to ``verify_single_reference``.
+    Registers all eight pipeline nodes and connects them with deterministic
+    edges plus a conditional fan-out edge from ``normalize_references`` that
+    dispatches one ``Send`` per reference to ``verify_single_reference``.
+
+    New in Phase B: ``analyze_cross_patterns`` and ``ai_adjudicate`` are
+    inserted between ``classify_results`` and ``assemble_report``.
 
     Returns:
         A compiled LangGraph executable (``CompiledGraph``).
@@ -134,6 +156,8 @@ def build_graph():
     graph.add_node("normalize_references", normalize_references)
     graph.add_node("verify_single_reference", verify_single_reference)
     graph.add_node("classify_results", classify_results)
+    graph.add_node("analyze_cross_patterns", analyze_cross_patterns)
+    graph.add_node("ai_adjudicate", ai_adjudicate)
     graph.add_node("assemble_report", assemble_report)
 
     # --- Linear edges ---
@@ -148,7 +172,10 @@ def build_graph():
     graph.add_edge("verify_single_reference", "classify_results")
 
     # --- Linear edges (post fan-in) ---
-    graph.add_edge("classify_results", "assemble_report")
+    # Phase B: classify → analyze_cross_patterns → ai_adjudicate → assemble
+    graph.add_edge("classify_results", "analyze_cross_patterns")
+    graph.add_edge("analyze_cross_patterns", "ai_adjudicate")
+    graph.add_edge("ai_adjudicate", "assemble_report")
     graph.add_edge("assemble_report", END)
 
     return graph.compile()

@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
 import { FileDropzone } from "@/components/file-dropzone";
 import { UploadStatus } from "@/components/upload-status";
 import { BackgroundGrid } from "@/components/background-grid";
 import { RecentAnalyses } from "@/components/recent-analyses";
+import { useTranslations } from "next-intl";
 import { simulateProgress, sourceTypeFromFileName } from "@/lib/file";
-import { ERROR_MESSAGES, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
+import { ERROR_KEYS, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
+import { fetchSampleDocument } from "@/lib/sampleDocument";
 import type { UploadState } from "@/lib/schemas/upload";
 import type { BibliographyCheckBasePayload } from "@/lib/schemas/bibliographyCheck";
 import { bibliographyCheckBaseSchema } from "@/lib/schemas/bibliographyCheck";
@@ -35,6 +39,8 @@ const initialState: UploadState = {
 };
 
 export default function Home() {
+  const t = useTranslations();
+  const searchParams = useSearchParams();
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>(initialState);
 
@@ -72,6 +78,67 @@ export default function Home() {
     }
     return false;
   });
+
+  /**
+   * Re-entry guard for the ?sample=1 auto-load flow.
+   *
+   * useRef is required (not useState) because React Strict Mode double-mounts
+   * components in development; a useState boolean resets on the second mount
+   * and would re-trigger the fetch. useRef survives this cycle.
+   */
+  const autoTriggeredRef = useRef(false);
+
+  /**
+   * Set to true after the sample file is loaded.
+   * The useEffect below watches both this flag and `file`; when both are set
+   * it calls handleUpload() to avoid the setState-is-async race condition
+   * (Pattern A from spec step 11 §6).
+   */
+  const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
+
+  /**
+   * Mount effect — checks for ?sample=1 and, if present:
+   *   1. Removes the param from the URL synchronously (before any async work).
+   *   2. Fetches and validates the sample document.
+   *   3. Sets file state + auto-submit flag.
+   *
+   * Runs only once per mount thanks to autoTriggeredRef.
+   */
+  useEffect(() => {
+    const sampleParam = searchParams.get("sample");
+    if (sampleParam !== "1" || autoTriggeredRef.current) return;
+    autoTriggeredRef.current = true;
+
+    // Clean URL synchronously BEFORE starting the async fetch so that:
+    // - Back-navigation restores the clean URL regardless of fetch outcome.
+    // - A mid-flight failure does not leave ?sample=1 visible on error.
+    window.history.replaceState({}, "", window.location.pathname);
+
+    fetchSampleDocument()
+      .then((sampleFile) => {
+        setFile(sampleFile);
+        setShouldAutoSubmit(true);
+      })
+      .catch(() => {
+        handleError(t(ERROR_KEYS.NETWORK_ERROR as Parameters<typeof t>[0]));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Auto-submit effect (Pattern A) — waits until both the auto-submit flag and
+   * the file state are set before calling handleUpload(), resolving the
+   * setState async race condition.
+   */
+  useEffect(() => {
+    if (shouldAutoSubmit && file !== null) {
+      void handleUpload();
+      setShouldAutoSubmit(false);
+    }
+  // handleUpload has a stable identity (useCallback with [file, addTrackedJob, t]).
+  // Including file here is intentional — the effect must wait for file to be set.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldAutoSubmit, file]);
 
   const handleFileSelect = useCallback((selected: File | null) => {
     setFile(selected);
@@ -125,7 +192,7 @@ export default function Home() {
         setUploadState({
           status: "error",
           progress: 0,
-          error: initData.message || ERROR_MESSAGES.UPLOAD_FAILED,
+          error: initData.message || t(ERROR_KEYS.UPLOAD_FAILED),
           fileName: file.name,
         });
         return;
@@ -140,7 +207,7 @@ export default function Home() {
         setUploadState({
           status: "error",
           progress: 0,
-          error: ERROR_MESSAGES.UPLOAD_FAILED,
+          error: t(ERROR_KEYS.UPLOAD_FAILED),
           fileName: file.name,
         });
         return;
@@ -153,7 +220,7 @@ export default function Home() {
         setUploadState({
           status: "error",
           progress: 0,
-          error: ERROR_MESSAGES.INVALID_TYPE,
+          error: t(ERROR_KEYS.UNSUPPORTED_FORMAT),
           fileName: file.name,
         });
         return;
@@ -168,7 +235,7 @@ export default function Home() {
         setUploadState({
           status: "error",
           progress: 0,
-          error: ERROR_MESSAGES.INVALID_TYPE,
+          error: t(ERROR_KEYS.UNSUPPORTED_FORMAT),
           fileName: file.name,
         });
         return;
@@ -205,7 +272,7 @@ export default function Home() {
         setUploadState({
           status: "error",
           progress: 0,
-          error: ERROR_MESSAGES.UPLOAD_FAILED,
+          error: t(ERROR_KEYS.ANALYSIS_START_FAILED),
           fileName: file.name,
         });
         return;
@@ -221,7 +288,7 @@ export default function Home() {
         setUploadState({
           status: "error",
           progress: 0,
-          error: checkMessage || ERROR_MESSAGES.UPLOAD_FAILED,
+          error: checkMessage || t(ERROR_KEYS.ANALYSIS_START_FAILED),
           fileName: file.name,
         });
         return;
@@ -276,11 +343,11 @@ export default function Home() {
       setUploadState({
         status: "error",
         progress: 0,
-        error: ERROR_MESSAGES.UPLOAD_FAILED,
+        error: t(ERROR_KEYS.UPLOAD_FAILED),
         fileName: file.name,
       });
     }
-  }, [file, addTrackedJob]);
+  }, [file, addTrackedJob, t]);
 
   const handleReset = useCallback(() => {
     setFile(null);
@@ -300,19 +367,22 @@ export default function Home() {
               backgroundImage: "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
             }}
           >
-            Biblio Checker
+            {t("common.app_name")}
           </span>
         </h1>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main */}
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-8 px-6 pb-16 sm:px-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Upload Your Bibliography
+            {t("home.hero_title")}
           </h2>
-          <p className="mt-3 text-muted">Upload a PDF or DOCX file.</p>
+          <p className="mt-3 text-muted">{t("home.hero_subtitle")}</p>
         </div>
 
         <div className="w-full space-y-6">
@@ -332,13 +402,13 @@ export default function Home() {
                   background: "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
                 }}
               >
-                Upload
+                {t("common.submit")}
               </button>
               <button
                 onClick={handleReset}
                 className="rounded-lg border border-border bg-surface px-6 py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
               >
-                Clear
+                {t("common.cancel")}
               </button>
             </div>
           )}
@@ -350,22 +420,25 @@ export default function Home() {
               onClick={handleReset}
               className="mx-auto block text-sm text-accent hover:underline transition-colors animate-slide-up"
             >
-              Upload another file
+              {t("upload.upload_another")}
             </button>
           )}
         </div>
 
+      </main>
+
+      <section className="mx-auto w-full max-w-4xl px-6 pb-16 sm:px-8">
         <RecentAnalyses
           jobs={jobs}
           onRemoveJob={removeTrackedJob}
           storageFullError={storageFullError}
           storageCorruptedError={storageCorruptedError}
         />
-      </main>
+      </section>
 
       {/* Footer */}
       <footer className="py-6 text-center text-xs text-muted">
-        Biblio Checker &mdash; Academic reference validation
+        {t("home.footer_tagline")}
       </footer>
     </div>
   );

@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useDropzone, type FileRejection } from "react-dropzone";
-import { Upload, FileText, X } from "lucide-react";
+import { Upload, FileText, X, FlaskConical } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { validateFile, formatFileSize } from "@/lib/file";
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/constants";
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE, ERROR_KEYS } from "@/lib/constants";
+import { fetchSampleDocument } from "@/lib/sampleDocument";
 
 interface FileDropzoneProps {
   file: File | null;
@@ -20,14 +22,17 @@ export function FileDropzone({
   onError,
   disabled,
 }: FileDropzoneProps) {
+  const t = useTranslations();
+  const [sampleLoading, setSampleLoading] = useState(false);
+
   const onDrop = useCallback(
     (accepted: File[], rejected: FileRejection[]) => {
       if (rejected.length > 0) {
         const code = rejected[0].errors[0]?.code;
         if (code === "file-too-large") {
-          onError("File exceeds the maximum size of 10 MB.");
+          onError(t(ERROR_KEYS.FILE_TOO_LARGE as Parameters<typeof t>[0]));
         } else {
-          onError("Only PDF and DOCX files are allowed.");
+          onError(t(ERROR_KEYS.UNSUPPORTED_FORMAT as Parameters<typeof t>[0]));
         }
         return;
       }
@@ -41,7 +46,7 @@ export function FileDropzone({
         onFileSelect(accepted[0]);
       }
     },
-    [onFileSelect, onError]
+    [onFileSelect, onError, t]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -49,8 +54,29 @@ export function FileDropzone({
     accept: ALLOWED_MIME_TYPES,
     maxSize: MAX_FILE_SIZE,
     multiple: false,
-    disabled,
+    disabled: disabled || sampleLoading,
   });
+
+  const handleTrySample = useCallback(
+    async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+
+      if (disabled || sampleLoading) return;
+
+      setSampleLoading(true);
+      try {
+        const sampleFile = await fetchSampleDocument();
+        onFileSelect(sampleFile);
+      } catch {
+        onError(t(ERROR_KEYS.NETWORK_ERROR as Parameters<typeof t>[0]));
+      } finally {
+        setSampleLoading(false);
+      }
+    },
+    [disabled, sampleLoading, onFileSelect, onError, t]
+  );
+
+  const isSampleDisabled = disabled || sampleLoading;
 
   return (
     <div
@@ -90,7 +116,7 @@ export function FileDropzone({
             className="mt-1 flex items-center gap-1 text-sm text-muted hover:text-red-400 transition-colors"
           >
             <X className="h-3 w-3" />
-            Remove
+            {t("common.remove" as Parameters<typeof t>[0])}
           </button>
         </div>
       ) : (
@@ -104,12 +130,40 @@ export function FileDropzone({
           <div>
             <p className="font-medium text-foreground">
               {isDragActive
-                ? "Drop your file here"
-                : "Drag & drop your file here"}
+                ? t("dropzone.prompt_primary" as Parameters<typeof t>[0])
+                : t("dropzone.prompt_primary" as Parameters<typeof t>[0])}
             </p>
             <p className="mt-1 text-sm text-muted">
-              PDF or DOCX, up to 10 MB
+              {t("dropzone.prompt_secondary" as Parameters<typeof t>[0])}
             </p>
+          </div>
+
+          {/* Sample document section */}
+          <div className="mt-2 flex flex-col items-center gap-2">
+            <span className="text-xs text-muted">
+              {t("dropzone.or" as Parameters<typeof t>[0])}
+            </span>
+            <button
+              type="button"
+              onClick={handleTrySample}
+              disabled={isSampleDisabled}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm transition-colors",
+                isSampleDisabled
+                  ? "cursor-not-allowed opacity-50 text-muted"
+                  : "text-foreground hover:border-accent/60 hover:text-accent"
+              )}
+            >
+              <FlaskConical className="h-4 w-4" />
+              {sampleLoading
+                ? t("dropzone.sampleLoading" as Parameters<typeof t>[0])
+                : t("dropzone.trySample" as Parameters<typeof t>[0])}
+            </button>
+            {!sampleLoading && (
+              <p className="text-xs text-muted">
+                {t("dropzone.sampleDescription" as Parameters<typeof t>[0])}
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ from biblio_checker_worker.langgraph.nodes.extract_text import extract_text
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_state(file_bytes: bytes, source_type: str) -> dict:
     return {"file_bytes": file_bytes, "source_type": source_type}
 
@@ -32,8 +33,11 @@ def _make_minimal_pdf(text: str = "Hello PDF") -> bytes:
     )
     stream = b"BT /F1 12 Tf 100 700 Td (" + text.encode() + b") Tj ET"
     content += (
-        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n"
-        + stream + b"\nendstream\nendobj\n"
+        b"<< /Length "
+        + str(len(stream)).encode()
+        + b" >>\nstream\n"
+        + stream
+        + b"\nendstream\nendobj\n"
         b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
     )
     xref_offset = len(content)
@@ -56,16 +60,12 @@ def _make_minimal_docx(paragraphs: list[str]) -> bytes:
     buf = io.BytesIO()
 
     # Minimal document.xml
-    para_xml = "".join(
-        f"<w:p><w:r><w:t>{p}</w:t></w:r></w:p>" for p in paragraphs
-    )
+    para_xml = "".join(f"<w:p><w:r><w:t>{p}</w:t></w:r></w:p>" for p in paragraphs)
     document_xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"'
         ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        "<w:body>"
-        + para_xml
-        + "</w:body></w:document>"
+        "<w:body>" + para_xml + "</w:body></w:document>"
     ).encode()
 
     content_types_xml = (
@@ -106,13 +106,17 @@ def _make_minimal_docx(paragraphs: list[str]) -> bytes:
 # PDF extraction
 # ---------------------------------------------------------------------------
 
+
 class TestPdfExtraction:
     def test_pdf_returns_raw_text(self) -> None:
         """PDF text is extracted and returned under 'raw_text' key."""
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             state = _make_state(b"fake-pdf-bytes", "pdf")
 
             with patch(
@@ -122,7 +126,8 @@ class TestPdfExtraction:
 
             # Patch pdfminer at the import location inside the function
             with patch(
-                "pdfminer.high_level.extract_text", return_value="Reference one\nReference two"
+                "pdfminer.high_level.extract_text",
+                return_value="Reference one\nReference two",
             ):
                 result = extract_text(state)
 
@@ -133,8 +138,13 @@ class TestPdfExtraction:
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
-            with patch("pdfminer.high_level.extract_text", return_value="line1\r\nline2\rline3"):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
+            with patch(
+                "pdfminer.high_level.extract_text", return_value="line1\r\nline2\rline3"
+            ):
                 result = extract_text(_make_state(b"pdf", "pdf"))
 
         assert result["raw_text"] == "line1\nline2\nline3"
@@ -144,8 +154,14 @@ class TestPdfExtraction:
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
-            with patch("pdfminer.high_level.extract_text", side_effect=RuntimeError("corrupt PDF")):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
+            with patch(
+                "pdfminer.high_level.extract_text",
+                side_effect=RuntimeError("corrupt PDF"),
+            ):
                 with pytest.raises(RuntimeError, match="corrupt PDF"):
                     extract_text(_make_state(b"bad-pdf", "pdf"))
 
@@ -153,6 +169,7 @@ class TestPdfExtraction:
 # ---------------------------------------------------------------------------
 # DOCX extraction
 # ---------------------------------------------------------------------------
+
 
 class TestDocxExtraction:
     def test_docx_joins_paragraphs_with_newline(self) -> None:
@@ -163,7 +180,10 @@ class TestDocxExtraction:
         docx_bytes = _make_minimal_docx(["Author A (2020)", "Author B (2019)"])
         state = _make_state(docx_bytes, "docx")
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             result = extract_text(state)
 
         assert "Author A (2020)" in result["raw_text"]
@@ -182,7 +202,10 @@ class TestDocxExtraction:
 
         docx_bytes = _make_minimal_docx(["placeholder"])
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("docx.Document", return_value=mock_doc):
                 result = extract_text(_make_state(docx_bytes, "docx"))
 
@@ -195,7 +218,10 @@ class TestDocxExtraction:
 
         docx_bytes = _make_minimal_docx(["placeholder"])
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("docx.Document", side_effect=RuntimeError("corrupt DOCX")):
                 with pytest.raises(RuntimeError, match="corrupt DOCX"):
                     extract_text(_make_state(docx_bytes, "docx"))
@@ -205,13 +231,17 @@ class TestDocxExtraction:
 # Empty document
 # ---------------------------------------------------------------------------
 
+
 class TestEmptyDocument:
     def test_pdf_empty_returns_empty_string(self) -> None:
         """PDF returning empty string does not raise — returns raw_text=''."""
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("pdfminer.high_level.extract_text", return_value=""):
                 result = extract_text(_make_state(b"pdf", "pdf"))
 
@@ -225,7 +255,10 @@ class TestEmptyDocument:
         docx_bytes = _make_minimal_docx([])
         state = _make_state(docx_bytes, "docx")
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             result = extract_text(state)
 
         assert result == {"raw_text": ""}
@@ -235,7 +268,10 @@ class TestEmptyDocument:
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("pdfminer.high_level.extract_text", return_value=None):
                 result = extract_text(_make_state(b"pdf", "pdf"))
 
@@ -246,13 +282,17 @@ class TestEmptyDocument:
 # Oversized document
 # ---------------------------------------------------------------------------
 
+
 class TestOversizedDocument:
     def test_raises_value_error_when_text_exceeds_max_chars(self) -> None:
         """ValueError is raised when extracted text exceeds max_text_chars."""
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 10  # very small limit
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("pdfminer.high_level.extract_text", return_value="x" * 11):
                 with pytest.raises(ValueError, match="max_text_chars"):
                     extract_text(_make_state(b"pdf", "pdf"))
@@ -262,7 +302,10 @@ class TestOversizedDocument:
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 5
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("pdfminer.high_level.extract_text", return_value="x" * 100):
                 with pytest.raises(ValueError) as exc_info:
                     extract_text(_make_state(b"pdf", "pdf"))
@@ -276,7 +319,10 @@ class TestOversizedDocument:
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 10
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("pdfminer.high_level.extract_text", return_value="x" * 10):
                 result = extract_text(_make_state(b"pdf", "pdf"))
 
@@ -287,13 +333,17 @@ class TestOversizedDocument:
 # Unsupported source_type
 # ---------------------------------------------------------------------------
 
+
 class TestUnsupportedSourceType:
     def test_raises_value_error_for_unknown_type(self) -> None:
         """ValueError is raised for unsupported source_type values."""
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with pytest.raises(ValueError, match="Unsupported source_type: txt"):
                 extract_text(_make_state(b"data", "txt"))
 
@@ -302,7 +352,10 @@ class TestUnsupportedSourceType:
         mock_settings = MagicMock()
         mock_settings.max_text_chars = 500_000
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with pytest.raises(ValueError, match="Unsupported source_type: html"):
                 extract_text(_make_state(b"data", "html"))
 
@@ -310,6 +363,7 @@ class TestUnsupportedSourceType:
 # ---------------------------------------------------------------------------
 # ZIP bomb protection
 # ---------------------------------------------------------------------------
+
 
 class TestZipBombProtection:
     def test_raises_value_error_for_oversized_docx_archive(self) -> None:
@@ -326,7 +380,10 @@ class TestZipBombProtection:
         mock_zip.__exit__ = MagicMock(return_value=False)
         mock_zip.infolist.return_value = [mock_info]
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             with patch("zipfile.ZipFile", return_value=mock_zip):
                 with pytest.raises(ValueError, match="DOCX archive too large"):
                     extract_text(_make_state(b"zip-data", "docx"))
@@ -338,7 +395,10 @@ class TestZipBombProtection:
 
         docx_bytes = _make_minimal_docx(["Valid reference"])
 
-        with patch("biblio_checker_worker.langgraph.nodes.extract_text.get_settings", return_value=mock_settings):
+        with patch(
+            "biblio_checker_worker.langgraph.nodes.extract_text.get_settings",
+            return_value=mock_settings,
+        ):
             result = extract_text(_make_state(docx_bytes, "docx"))
 
         assert "Valid reference" in result["raw_text"]

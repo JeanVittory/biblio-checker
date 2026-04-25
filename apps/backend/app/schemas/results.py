@@ -42,25 +42,32 @@ class ReasonCode(StrEnum):
 # ---------------------------------------------------------------------------
 
 _ALLOWED_BANDS: dict[Classification, frozenset[ConfidenceBand | None]] = {
-    Classification.VERIFIED:        frozenset({ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}),
-    Classification.LIKELY_VERIFIED: frozenset({ConfidenceBand.MEDIUM, ConfidenceBand.HIGH}),
-    Classification.AMBIGUOUS:       frozenset({ConfidenceBand.LOW, ConfidenceBand.MEDIUM}),
-    Classification.NOT_FOUND:       frozenset({ConfidenceBand.VERY_LOW, ConfidenceBand.LOW}),
-    Classification.SUSPICIOUS:      frozenset({ConfidenceBand.MEDIUM, ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}),
+    Classification.VERIFIED: frozenset({ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}),
+    Classification.LIKELY_VERIFIED: frozenset(
+        {ConfidenceBand.MEDIUM, ConfidenceBand.HIGH}
+    ),
+    Classification.AMBIGUOUS: frozenset({ConfidenceBand.LOW, ConfidenceBand.MEDIUM}),
+    Classification.NOT_FOUND: frozenset({ConfidenceBand.VERY_LOW, ConfidenceBand.LOW}),
+    Classification.SUSPICIOUS: frozenset(
+        {ConfidenceBand.MEDIUM, ConfidenceBand.HIGH, ConfidenceBand.VERY_HIGH}
+    ),
     Classification.PROCESSING_ERROR: frozenset({None}),
 }
 
-_REQUIRED_MANUAL_REVIEW: frozenset[Classification] = frozenset({
-    Classification.AMBIGUOUS,
-    Classification.NOT_FOUND,
-    Classification.SUSPICIOUS,
-    Classification.PROCESSING_ERROR,
-})
+_REQUIRED_MANUAL_REVIEW: frozenset[Classification] = frozenset(
+    {
+        Classification.AMBIGUOUS,
+        Classification.NOT_FOUND,
+        Classification.SUSPICIOUS,
+        Classification.PROCESSING_ERROR,
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Sub-models
 # ---------------------------------------------------------------------------
+
 
 class NormalizedReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -147,20 +154,20 @@ class ReferenceResult(BaseModel):
     evidence: list[EvidenceItem]
 
     @model_validator(mode="after")
-    def validate_compatibility_matrix(self) -> "ReferenceResult":
+    def validate_compatibility_matrix(self) -> ReferenceResult:
         allowed = _ALLOWED_BANDS[self.classification]
         if self.confidenceBand not in allowed:
             raise ValueError(
                 f"classification='{self.classification}' is incompatible with "
                 f"confidenceBand='{self.confidenceBand}'. "
-                f"Allowed: {sorted(str(b) for b in allowed if b is not None) or ['null']}"
+                f"Allowed: {sorted(str(b) for b in allowed if b is not None) or ['null']}"  # noqa: E501
             )
 
         expected_manual = self.classification in _REQUIRED_MANUAL_REVIEW
         if self.manualReviewRequired != expected_manual:
             raise ValueError(
                 f"classification='{self.classification}' requires "
-                f"manualReviewRequired={expected_manual}, got {self.manualReviewRequired}"
+                f"manualReviewRequired={expected_manual}, got {self.manualReviewRequired}"  # noqa: E501
             )
 
         if self.classification == Classification.PROCESSING_ERROR:
@@ -176,18 +183,19 @@ class ReferenceResult(BaseModel):
 # Root model
 # ---------------------------------------------------------------------------
 
+
 class ResultsV1(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schemaVersion: str = Field(..., pattern=r"^1\.0$")
-    reportLanguage: str = Field(..., pattern=r"^es$")
+    reportLanguage: str = Field(..., pattern=r"^(es|pt|en)$")
     pipeline: Pipeline
     summary: Summary
     references: list[ReferenceResult]
     warnings: list[Warning]
 
     @model_validator(mode="after")
-    def validate_cross_field_invariants(self) -> "ResultsV1":
+    def validate_cross_field_invariants(self) -> ResultsV1:
         n = len(self.references)
         analyzed = self.summary.totalReferencesAnalyzed
         detected = self.summary.totalReferencesDetected

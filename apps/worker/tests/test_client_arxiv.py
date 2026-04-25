@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from biblio_checker_worker.langgraph.clients.arxiv import ARXIV_BASE_URL, ArxivClient, _parse_feed
+from biblio_checker_worker.langgraph.clients.arxiv import (
+    ARXIV_BASE_URL,
+    ArxivClient,
+    _parse_feed,
+)
 from biblio_checker_worker.langgraph.schemas import MatchCandidate
 
 
@@ -30,9 +34,7 @@ def _atom_entry(
 ) -> str:
     if authors is None:
         authors = ["Vaswani, Ashish", "Shazeer, Noam"]
-    author_xml = "".join(
-        f"<author><name>{a}</name></author>" for a in authors
-    )
+    author_xml = "".join(f"<author><name>{a}</name></author>" for a in authors)
     doi_xml = f"<arxiv:doi>{doi}</arxiv:doi>" if doi else ""
     return f"""
   <entry>
@@ -57,6 +59,7 @@ def _empty_feed() -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_client(**kwargs) -> ArxivClient:
     return ArxivClient(timeout=5, **kwargs)
 
@@ -77,6 +80,7 @@ def _mock_response(status_code: int, text: str = "") -> MagicMock:
 # ---------------------------------------------------------------------------
 # XML parsing unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestArxivXmlParsing:
     def test_parse_single_entry(self) -> None:
@@ -103,8 +107,12 @@ class TestArxivXmlParsing:
         assert results == []
 
     def test_parse_multiple_entries(self) -> None:
-        entry1 = _atom_entry(abs_url="http://arxiv.org/abs/2301.00001v1", title="Paper One")
-        entry2 = _atom_entry(abs_url="http://arxiv.org/abs/2301.00002v1", title="Paper Two")
+        entry1 = _atom_entry(
+            abs_url="http://arxiv.org/abs/2301.00001v1", title="Paper One"
+        )
+        entry2 = _atom_entry(
+            abs_url="http://arxiv.org/abs/2301.00002v1", title="Paper Two"
+        )
         xml = _atom_feed(entry1, entry2)
         results = _parse_feed(xml, match_type="title_fuzzy", raw_score=0.0)
         assert len(results) == 2
@@ -129,22 +137,49 @@ class TestArxivXmlParsing:
 # arXiv ID lookup
 # ---------------------------------------------------------------------------
 
+
 class TestArxivIdLookup:
     def test_id_found_returns_candidate_with_identifier_exact(self) -> None:
         xml = _atom_feed(_atom_entry())
         client = _make_client()
-        with patch.object(client._client, "get", return_value=_mock_response(200, text=xml)):
+        with patch.object(
+            client._client, "get", return_value=_mock_response(200, text=xml)
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title=None, authors=[], year=None, doi=None, arxiv_id="2301.12345", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="2301.12345",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert len(results) == 1
         assert results[0].match_type == "identifier_exact"
         assert results[0].raw_score == 1.0
 
     def test_id_not_found_returns_empty_list(self) -> None:
         client = _make_client()
-        with patch.object(client._client, "get", return_value=_mock_response(200, text=_empty_feed())):
+        with patch.object(
+            client._client, "get", return_value=_mock_response(200, text=_empty_feed())
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title=None, authors=[], year=None, doi=None, arxiv_id="2301.99999", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="2301.99999",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert results == []
 
     def test_invalid_arxiv_id_format_skips_lookup(self) -> None:
@@ -153,7 +188,18 @@ class TestArxivIdLookup:
         title_resp = _mock_response(200, text=_empty_feed())
         with patch.object(client._client, "get", return_value=title_resp) as mock_get:
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title="Some Title", authors=[], year=None, doi=None, arxiv_id="not-valid-id", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title="Some Title",
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="not-valid-id",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         # Only title search should have been called (1 call)
         assert mock_get.call_count == 1
         assert results == []
@@ -170,7 +216,18 @@ class TestArxivIdLookup:
 
         with patch.object(client._client, "get", side_effect=fake_get):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                client.search(title=None, authors=[], year=None, doi=None, arxiv_id="hep-ph/9901234", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="hep-ph/9901234",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
 
         assert captured[0].get("id_list") == "hep-ph/9901234"
 
@@ -179,13 +236,27 @@ class TestArxivIdLookup:
 # DOI search
 # ---------------------------------------------------------------------------
 
+
 class TestArxivDoiSearch:
     def test_doi_search_returns_doi_exact_candidate(self) -> None:
         xml = _atom_feed(_atom_entry(doi="10.1234/example"))
         client = _make_client()
-        with patch.object(client._client, "get", return_value=_mock_response(200, text=xml)):
+        with patch.object(
+            client._client, "get", return_value=_mock_response(200, text=xml)
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title=None, authors=[], year=None, doi="10.1234/example", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi="10.1234/example",
+                    arxiv_id=None,
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert len(results) == 1
         assert results[0].match_type == "doi_exact"
 
@@ -194,7 +265,18 @@ class TestArxivDoiSearch:
         title_resp = _mock_response(200, text=_empty_feed())
         with patch.object(client._client, "get", return_value=title_resp) as mock_get:
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title="Some Title", authors=[], year=None, doi="not-a-doi", arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title="Some Title",
+                    authors=[],
+                    year=None,
+                    doi="not-a-doi",
+                    arxiv_id=None,
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         # Only title search should have fired (1 call)
         assert mock_get.call_count == 1
         assert results == []
@@ -204,6 +286,7 @@ class TestArxivDoiSearch:
 # Title + Author search (NEW)
 # ---------------------------------------------------------------------------
 
+
 class TestArxivTitleAuthorSearch:
     def test_title_author_returns_candidates(self) -> None:
         """Combined title+author search produces results when ID and DOI fail."""
@@ -211,12 +294,16 @@ class TestArxivTitleAuthorSearch:
         empty = _empty_feed()
 
         # id lookup returns empty, doi is None, title+author finds result
-        responses = iter([
-            _mock_response(200, text=xml),  # title+author search finds result
-        ])
+        responses = iter(
+            [
+                _mock_response(200, text=xml),  # title+author search finds result
+            ]
+        )
 
         client = _make_client()
-        with patch.object(client._client, "get", side_effect=lambda *a, **k: next(responses)):
+        with patch.object(
+            client._client, "get", side_effect=lambda *a, **k: next(responses)
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
                 results = client.search(
                     title="Attention Is All You Need",
@@ -322,30 +409,62 @@ class TestArxivTitleAuthorSearch:
 # Title search
 # ---------------------------------------------------------------------------
 
+
 class TestArxivTitleSearch:
     def test_title_search_returns_title_fuzzy_candidates(self) -> None:
-        entry1 = _atom_entry(abs_url="http://arxiv.org/abs/2301.00001v1", title="Neural Nets")
-        entry2 = _atom_entry(abs_url="http://arxiv.org/abs/2301.00002v1", title="Neural Networks")
+        entry1 = _atom_entry(
+            abs_url="http://arxiv.org/abs/2301.00001v1", title="Neural Nets"
+        )
+        entry2 = _atom_entry(
+            abs_url="http://arxiv.org/abs/2301.00002v1", title="Neural Networks"
+        )
         xml = _atom_feed(entry1, entry2)
         client = _make_client()
-        with patch.object(client._client, "get", return_value=_mock_response(200, text=xml)):
+        with patch.object(
+            client._client, "get", return_value=_mock_response(200, text=xml)
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title="Neural", authors=[], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title="Neural",
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id=None,
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert len(results) == 2
         assert all(c.match_type == "title_fuzzy" for c in results)
         assert all(c.raw_score == 0.0 for c in results)
 
     def test_title_search_no_results_returns_empty(self) -> None:
         client = _make_client()
-        with patch.object(client._client, "get", return_value=_mock_response(200, text=_empty_feed())):
+        with patch.object(
+            client._client, "get", return_value=_mock_response(200, text=_empty_feed())
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title="UnknownTitle", authors=[], year=None, doi=None, arxiv_id=None, issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title="UnknownTitle",
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id=None,
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert results == []
 
 
 # ---------------------------------------------------------------------------
 # Surname extraction unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestArxivExtractSurname:
     def test_comma_format(self) -> None:
@@ -361,7 +480,9 @@ class TestArxivExtractSurname:
         assert ArxivClient._extract_surname("Aristotle") == "Aristotle"
 
     def test_compound_surname_comma_format(self) -> None:
-        assert ArxivClient._extract_surname("García Márquez, Gabriel") == "García Márquez"
+        assert (
+            ArxivClient._extract_surname("García Márquez, Gabriel") == "García Márquez"
+        )
 
     def test_empty_string_returns_empty(self) -> None:
         assert ArxivClient._extract_surname("") == ""
@@ -373,6 +494,7 @@ class TestArxivExtractSurname:
 # ---------------------------------------------------------------------------
 # Throttling behaviour
 # ---------------------------------------------------------------------------
+
 
 class TestArxivThrottling:
     def test_sleep_called_between_strategies(self) -> None:
@@ -387,8 +509,13 @@ class TestArxivThrottling:
         client = _make_client()
         sleep_calls: list[float] = []
 
-        with patch.object(client._client, "get", side_effect=lambda *a, **k: responses.pop(0)):
-            with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep", side_effect=lambda s: sleep_calls.append(s)):
+        with patch.object(
+            client._client, "get", side_effect=lambda *a, **k: responses.pop(0)
+        ):
+            with patch(
+                "biblio_checker_worker.langgraph.clients.arxiv.time.sleep",
+                side_effect=lambda s: sleep_calls.append(s),
+            ):
                 client.search(
                     title="Some Title",
                     authors=["Jane Smith"],
@@ -411,9 +538,25 @@ class TestArxivThrottling:
         client = _make_client()
         sleep_calls: list[float] = []
 
-        with patch.object(client._client, "get", return_value=_mock_response(200, text=xml)):
-            with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep", side_effect=lambda s: sleep_calls.append(s)):
-                client.search(title=None, authors=[], year=None, doi=None, arxiv_id="2301.12345", issn=None, volume=None, issue=None, pages=None, publisher=None)
+        with patch.object(
+            client._client, "get", return_value=_mock_response(200, text=xml)
+        ):
+            with patch(
+                "biblio_checker_worker.langgraph.clients.arxiv.time.sleep",
+                side_effect=lambda s: sleep_calls.append(s),
+            ):
+                client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="2301.12345",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
 
         # First (and only) request: no sleep
         assert sleep_calls == []
@@ -423,19 +566,42 @@ class TestArxivThrottling:
 # HTTP error handling
 # ---------------------------------------------------------------------------
 
+
 class TestArxivHttpErrors:
     def test_http_500_propagates(self) -> None:
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(500)):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
                 with pytest.raises(httpx.HTTPStatusError):
-                    client.search(title=None, authors=[], year=None, doi=None, arxiv_id="2301.12345", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                    client.search(
+                        title=None,
+                        authors=[],
+                        year=None,
+                        doi=None,
+                        arxiv_id="2301.12345",
+                        issn=None,
+                        volume=None,
+                        issue=None,
+                        pages=None,
+                        publisher=None,
+                    )
 
     def test_http_404_returns_empty(self) -> None:
         client = _make_client()
         with patch.object(client._client, "get", return_value=_mock_response(404)):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title=None, authors=[], year=None, doi=None, arxiv_id="2301.12345", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="2301.12345",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert results == []
 
 
@@ -443,18 +609,35 @@ class TestArxivHttpErrors:
 # Malformed XML response
 # ---------------------------------------------------------------------------
 
+
 class TestArxivMalformedXml:
     def test_malformed_xml_returns_empty_list_with_warning(self) -> None:
         client = _make_client()
-        with patch.object(client._client, "get", return_value=_mock_response(200, text="<not valid xml")):
+        with patch.object(
+            client._client,
+            "get",
+            return_value=_mock_response(200, text="<not valid xml"),
+        ):
             with patch("biblio_checker_worker.langgraph.clients.arxiv.time.sleep"):
-                results = client.search(title=None, authors=[], year=None, doi=None, arxiv_id="2301.12345", issn=None, volume=None, issue=None, pages=None, publisher=None)
+                results = client.search(
+                    title=None,
+                    authors=[],
+                    year=None,
+                    doi=None,
+                    arxiv_id="2301.12345",
+                    issn=None,
+                    volume=None,
+                    issue=None,
+                    pages=None,
+                    publisher=None,
+                )
         assert results == []
 
 
 # ---------------------------------------------------------------------------
 # close()
 # ---------------------------------------------------------------------------
+
 
 class TestArxivClose:
     def test_close_calls_underlying_client(self) -> None:

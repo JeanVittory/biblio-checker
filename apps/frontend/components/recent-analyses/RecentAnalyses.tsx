@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { useTranslations } from "next-intl";
 import { JobRow } from "./JobRow";
 import { StorageErrorBanner } from "./StorageErrorBanner";
 import type { StoredJob } from "@/lib/localStorage/recentAnalyses";
@@ -20,6 +21,7 @@ export function RecentAnalyses({
   storageFullError = false,
   storageCorruptedError = false,
 }: RecentAnalysesProps) {
+  const t = useTranslations("recent");
   const tableId = useId();
 
   const hasStorageErrors = storageFullError || storageCorruptedError;
@@ -43,7 +45,7 @@ export function RecentAnalyses({
   return (
     <section aria-labelledby={`${tableId}-heading`} className="w-full space-y-3">
       <h3 id={`${tableId}-heading`} className="text-sm font-semibold text-foreground">
-        Recent Analyses
+        {t("title")}
       </h3>
 
       {/* Storage error banners */}
@@ -52,32 +54,32 @@ export function RecentAnalyses({
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left">
+          <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border">
                 <th
                   scope="col"
                   className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted"
                 >
-                  File
+                  {t("columns.file")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted whitespace-nowrap"
                 >
-                  Submitted
+                  {t("columns.submitted")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted"
                 >
-                  Status
+                  {t("columns.status")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted"
                 >
-                  Actions
+                  {t("columns.actions")}
                 </th>
               </tr>
             </thead>

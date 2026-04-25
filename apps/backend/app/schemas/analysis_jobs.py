@@ -13,4 +13,3 @@ class AnalysisJobStatus(StrEnum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
-

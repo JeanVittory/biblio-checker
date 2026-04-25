@@ -15,11 +15,7 @@ def _build_minimal_pdf_with_text(text: str) -> bytes:
     header = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
 
     stream = (
-        "BT\n"
-        "/F1 24 Tf\n"
-        "72 200 Td\n"
-        f"({escape_pdf_string(text)}) Tj\n"
-        "ET\n"
+        f"BT\n/F1 24 Tf\n72 200 Td\n({escape_pdf_string(text)}) Tj\nET\n"
     ).encode()
 
     obj1 = pdf_obj(1, b"<< /Type /Catalog /Pages 2 0 R >>")

@@ -1,0 +1,268 @@
+{
+  "common": {
+    "app_name": "Biblio Checker",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "retry": "Retry",
+    "close": "Close",
+    "copy": "Copy",
+    "loading": "Loading…",
+    "language_label": "Language",
+    "theme_label": "Theme"
+  },
+  "home": {
+    "hero_title": "Upload Your Bibliography",
+    "hero_subtitle": "Upload a PDF or DOCX file.",
+    "footer_tagline": "Biblio Checker — Academic reference validation"
+  },
+  "upload": {
+    "uploading": "Uploading {fileName}…",
+    "upload_success": "File uploaded successfully.",
+    "upload_another": "Upload another file"
+  },
+  "dropzone": {
+    "prompt_primary": "Drop your file here",
+    "prompt_secondary": "PDF or DOCX, up to 10 MB",
+    "validation_file_too_large": "File exceeds the maximum size of 10 MB.",
+    "validation_unsupported_format": "Only PDF and DOCX files are allowed.",
+    "trySample": "Try with an example",
+    "sampleDescription": "See a sample analysis with real and fabricated references",
+    "sampleLoading": "Loading example...",
+    "or": "or"
+  },
+  "recent": {
+    "title": "Recent Analyses",
+    "empty_state": "No analyses yet. Upload a file to get started.",
+    "columns": {
+      "file": "File",
+      "submitted": "Submitted",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "view_details": "View details",
+      "hide_details": "Hide details",
+      "remove_job": "Remove job"
+    }
+  },
+  "status": {
+    "queued": "Queued",
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "expired": "Expired",
+    "waiting": "Waiting to be processed…",
+    "stage_label": "Stage: {stage}",
+    "processing_elapsed": "(processing for {elapsedLabel})",
+    "processing_started": "Processing… (started {elapsedLabel} ago)"
+  },
+  "results": {
+    "section": {
+      "analysis_result": "Analysis Result",
+      "reference_details": "Reference Details",
+      "raw_text": "Original text",
+      "normalized_fields": "Normalized fields",
+      "decision_reason": "Decision reason",
+      "candidates_found": "{count, plural, =0 {No candidates} one {# candidate} other {# candidates}}",
+      "reference": "Reference",
+      "candidate": "Candidate",
+      "view_record": "View record"
+    },
+    "summary": {
+      "detected": "References detected",
+      "analyzed": "References analyzed"
+    },
+    "fields": {
+      "authors": "Authors",
+      "year": "Year",
+      "venue": "Journal/Publisher",
+      "publisher": "Publisher",
+      "doi": "DOI",
+      "arxiv_id": "arXiv ID",
+      "issn": "ISSN",
+      "volume": "Volume",
+      "issue": "Issue",
+      "pages": "Pages",
+      "confidence": "Confidence"
+    },
+    "classification": {
+      "verified": "Verified",
+      "likely_verified": "Likely verified",
+      "ambiguous": "Ambiguous",
+      "not_found": "Not found",
+      "suspicious": "Suspicious",
+      "processing_error": "Error"
+    },
+    "confidence_band": {
+      "very_high": "Very high",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "very_low": "Very low"
+    },
+    "reason_code": {
+      "exact_doi_match": "Exact DOI match",
+      "strong_metadata_match": "Strong metadata match",
+      "weak_metadata_match": "Weak metadata match",
+      "cross_source_conflict": "Cross-source conflict",
+      "doi_conflict": "DOI conflict",
+      "ambiguous_multi_candidate": "Multiple plausible candidates",
+      "no_match_any_source": "No match in any source",
+      "suspicious_patterns": "Suspicious patterns detected",
+      "processing_error": "Processing error"
+    },
+    "match_type": {
+      "doi_exact": "DOI (exact)",
+      "title_fuzzy": "Title (fuzzy)",
+      "identifier_exact": "Identifier (exact)",
+      "issn_filter": "ISSN filter",
+      "author_title": "Title + author"
+    },
+    "no_candidates": "No candidates found in any source.",
+    "no_references": "No references found.",
+    "export": {
+      "csv": "Export CSV",
+      "pdf": "Export PDF",
+      "generating": "Generating...",
+      "csv_aria": "Export results as CSV",
+      "pdf_aria": "Export results as PDF",
+      "error": "Export failed. Please try again."
+    },
+    "score": {
+      "title": "Authenticity Score",
+      "high": "High authenticity",
+      "medium": "Needs review",
+      "low": "Low authenticity"
+    },
+    "pdf": {
+      "title": "Bibliographic Reference Analysis Report",
+      "disclaimer": "This report was generated automatically. Results should be verified manually for critical decisions.",
+      "summary": "Summary",
+      "references": "Reference Details",
+      "evidence": "Evidence",
+      "noEvidence": "No evidence found",
+      "notAvailable": "N/A",
+      "page": "Page {current} of {total}"
+    },
+    "share": {
+      "button": "Share",
+      "copied": "Link copied!",
+      "ready": "Link ready",
+      "error": "Could not generate link",
+      "generating": "Generating...",
+      "expired": "Sharing expired (token valid for 1 hour after submission)"
+    }
+  },
+  "errors": {
+    "storage_full": "Storage full. Please remove old jobs to continue.",
+    "storage_corrupted": "Unable to load job history. Data may be corrupted.",
+    "upload_failed": "Upload failed. Please try again.",
+    "analysis_start_failed": "Could not start analysis. Please try again.",
+    "status_fetch_failed": "Could not refresh job status.",
+    "network_error": "Network error. Check your connection and retry.",
+    "invalid_results_format": "Results format is invalid or unsupported.",
+    "pdf_generation_failed": "PDF generation failed. Please try again."
+  },
+  "sharePage": {
+    "title": "Shared Analysis Report",
+    "notFound": "This shared analysis was not found or has expired",
+    "resultError": "Results could not be loaded",
+    "tryBiblio": "Try Biblio Checker",
+    "poweredBy": "Powered by Biblio Checker",
+    "expiresOn": "This link expires on {date}",
+    "loading": "Loading shared analysis..."
+  },
+  "landing": {
+    "hero": {
+      "eyebrow": "Academic integrity, verified",
+      "title": "Detect fabricated academic references",
+      "subtitle": "AI-generated documents often contain plausible-looking but non-existent citations. Biblio Checker verifies each reference against trusted academic databases.",
+      "cta_primary": "Try now",
+      "cta_secondary": "See demo with example",
+      "socialProof": "Verified against OpenAlex, SciELO, arXiv"
+    },
+    "problem": {
+      "title": "The bibliographic deep fake problem",
+      "subtitle": "Why this tool exists",
+      "fact1": {
+        "title": "AI fabricates plausible citations",
+        "desc": "Large language models routinely generate realistic-looking references to papers and authors that do not exist."
+      },
+      "fact2": {
+        "title": "Manual verification takes hours",
+        "desc": "Checking dozens of references against multiple databases is slow and error-prone. Reviewers often skip it."
+      },
+      "fact3": {
+        "title": "Fake citations slip through review",
+        "desc": "Undetected fabricated references compromise academic integrity and erode trust in published work."
+      }
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "step1": {
+        "title": "Upload your document",
+        "desc": "Drop a PDF or DOCX file with a bibliography. No account needed."
+      },
+      "step2": {
+        "title": "We verify each reference",
+        "desc": "Every citation is cross-checked against OpenAlex, SciELO, and arXiv in parallel."
+      },
+      "step3": {
+        "title": "See authenticity score + evidence",
+        "desc": "A clear 0-100 score with per-reference verdicts, evidence, and a shareable report."
+      }
+    },
+    "demo": {
+      "title": "This is what you get",
+      "subtitle": "A real score from a document with mixed references",
+      "caption": "Example analysis"
+    },
+    "useCases": {
+      "title": "Built for your workflow",
+      "professor": {
+        "title": "Professors and reviewers",
+        "desc": "Validate student bibliographies and peer submissions in seconds. Share a link with the author to discuss findings."
+      },
+      "student": {
+        "title": "Students and researchers",
+        "desc": "Self-check your citations before submission. Catch fabricated or misattributed references in your own draft."
+      },
+      "institution": {
+        "title": "Institutions",
+        "desc": "LMS integrations and batch processing for academic departments. API access for automated workflows."
+      },
+      "comingSoon": "Coming soon"
+    },
+    "sources": {
+      "title": "Verified against trusted sources",
+      "subtitle": "We cross-check your references in parallel against the leading open academic databases.",
+      "openalex": {
+        "desc": "Global academic index"
+      },
+      "scielo": {
+        "desc": "Latin American journals"
+      },
+      "arxiv": {
+        "desc": "Preprints across sciences"
+      },
+      "openlibrary": {
+        "desc": "Books and publications"
+      }
+    },
+    "cta": {
+      "title": "Ready to verify your bibliography?",
+      "subtitle": "No account needed. Results in under a minute."
+    },
+    "footer": {
+      "product": "Product",
+      "resources": "Resources",
+      "home": "Home",
+      "app": "App",
+      "github": "GitHub",
+      "docs": "Documentation",
+      "about": "About",
+      "copyright": "© 2026 Biblio Checker"
+    }
+  }
+}
