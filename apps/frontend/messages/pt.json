@@ -9,7 +9,8 @@
     "copy": "Copiar",
     "loading": "Carregando…",
     "language_label": "Idioma",
-    "theme_label": "Tema"
+    "theme_label": "Tema",
+    "back_to_home": "Voltar ao início"
   },
   "home": {
     "hero_title": "Envie sua bibliografia",
@@ -29,7 +30,13 @@
     "trySample": "Experimentar com um exemplo",
     "sampleDescription": "Veja uma análise de exemplo com referências reais e fabricadas",
     "sampleLoading": "Carregando exemplo...",
-    "or": "ou"
+    "or": "ou",
+    "lockedPrompt": "Envio de documentos em breve",
+    "lockedHint": "Enquanto isso, experimente a análise com o exemplo"
+  },
+  "featureLocked": {
+    "uploadTooltip": "Em breve — a análise com seu próprio documento será habilitada em breve",
+    "tryDemoInstead": "Enquanto isso, experimente com o exemplo"
   },
   "recent": {
     "title": "Análises recentes",

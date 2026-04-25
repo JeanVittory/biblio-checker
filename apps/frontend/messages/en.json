@@ -9,7 +9,8 @@
     "copy": "Copy",
     "loading": "Loading…",
     "language_label": "Language",
-    "theme_label": "Theme"
+    "theme_label": "Theme",
+    "back_to_home": "Back to home"
   },
   "home": {
     "hero_title": "Upload Your Bibliography",
@@ -29,7 +30,13 @@
     "trySample": "Try with an example",
     "sampleDescription": "See a sample analysis with real and fabricated references",
     "sampleLoading": "Loading example...",
-    "or": "or"
+    "or": "or",
+    "lockedPrompt": "Document upload coming soon",
+    "lockedHint": "In the meantime, try the analysis with the example"
+  },
+  "featureLocked": {
+    "uploadTooltip": "Coming soon — analysis with your own document will be enabled shortly",
+    "tryDemoInstead": "In the meantime, try with the example"
   },
   "recent": {
     "title": "Recent Analyses",
