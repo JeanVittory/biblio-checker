@@ -7,6 +7,7 @@ import structlog
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from biblio_checker_worker.langgraph.clients.llm import get_llm
+from biblio_checker_worker.langgraph.i18n import render
 from biblio_checker_worker.langgraph.prompts.normalize import (
     NORMALIZE_SYSTEM_PROMPT,
     NORMALIZE_USER_PROMPT,
@@ -16,9 +17,7 @@ from biblio_checker_worker.langgraph.prompts.normalize import (
 if TYPE_CHECKING:
     from biblio_checker_worker.langgraph.state import GraphState
 
-logger = structlog.stdlib.get_logger(
-    "biblio_checker_worker.langgraph.nodes.normalize"
-)
+logger = structlog.stdlib.get_logger("biblio_checker_worker.langgraph.nodes.normalize")
 
 # DOI pattern: must start with "10." followed by 4+ digits, then "/", then
 # one or more non-whitespace segments.
@@ -34,9 +33,12 @@ _ARXIV_NEW_RE = re.compile(r"^\d{4}\.\d{4,5}(v\d+)?$")
 _ARXIV_OLD_RE = re.compile(r"^[a-z-]+/\d{7}$")
 
 
-def _validate_doi(doi: str | None) -> tuple[str | None, dict[str, Any] | None]:
+def _validate_doi(
+    doi: str | None, locale: str = "es"
+) -> tuple[str | None, dict[str, Any] | None]:
     """Validate a DOI string.
 
+    Option A (per spec): accepts ``locale`` and calls ``render()`` for the message.
     Returns ``(doi, None)`` if valid, or ``(None, warning_dict)`` if invalid.
     """
     if doi is None:
@@ -45,7 +47,7 @@ def _validate_doi(doi: str | None) -> tuple[str | None, dict[str, Any] | None]:
         return doi, None
     warning: dict[str, Any] = {
         "code": "invalid_doi_format",
-        "message": f"DOI '{doi}' does not match expected format and was discarded.",
+        "message": render("warn.invalid_doi_format", locale, doi=doi),
         "referenceId": None,  # filled in by caller
         "details": None,
     }
@@ -54,9 +56,11 @@ def _validate_doi(doi: str | None) -> tuple[str | None, dict[str, Any] | None]:
 
 def _validate_arxiv_id(
     arxiv_id: str | None,
+    locale: str = "es",
 ) -> tuple[str | None, dict[str, Any] | None]:
     """Validate an arXiv identifier string.
 
+    Option A (per spec): accepts ``locale`` and calls ``render()`` for the message.
     Returns ``(arxiv_id, None)`` if valid, or ``(None, warning_dict)`` if invalid.
     """
     if arxiv_id is None:
@@ -65,18 +69,19 @@ def _validate_arxiv_id(
         return arxiv_id, None
     warning: dict[str, Any] = {
         "code": "invalid_arxiv_id_format",
-        "message": (
-            f"arXiv ID '{arxiv_id}' does not match expected format and was discarded."
-        ),
+        "message": render("warn.invalid_arxiv_id_format", locale, arxiv_id=arxiv_id),
         "referenceId": None,  # filled in by caller
         "details": None,
     }
     return None, warning
 
 
-def _validate_issn(issn: str | None) -> tuple[str | None, dict[str, Any] | None]:
+def _validate_issn(
+    issn: str | None, locale: str = "es"
+) -> tuple[str | None, dict[str, Any] | None]:
     """Validate an ISSN string.
 
+    Option A (per spec): accepts ``locale`` and calls ``render()`` for the message.
     Returns ``(issn, None)`` if valid, or ``(None, warning_dict)`` if invalid.
     """
     if issn is None:
@@ -85,14 +90,14 @@ def _validate_issn(issn: str | None) -> tuple[str | None, dict[str, Any] | None]
         return issn.upper(), None  # Normalize lowercase 'x' check digit to 'X'
     warning: dict[str, Any] = {
         "code": "invalid_issn_format",
-        "message": f"ISSN '{issn}' does not match expected format and was discarded.",
+        "message": render("warn.invalid_issn_format", locale, issn=issn),
         "referenceId": None,  # filled in by caller
         "details": None,
     }
     return None, warning
 
 
-def normalize_references(state: "GraphState") -> dict[str, Any]:
+def normalize_references(state: GraphState) -> dict[str, Any]:
     """Normalize raw bibliographic references into structured metadata.
 
     Sends all raw references to the LLM in a single batched call, then applies
@@ -106,6 +111,7 @@ def normalize_references(state: "GraphState") -> dict[str, Any]:
           issues are detected).
     """
     raw_references: list[dict] = state["raw_references"]
+    locale: str = state.get("locale", "es")  # type: ignore[attr-defined]
 
     if not raw_references:
         return {"normalized_references": []}
@@ -155,20 +161,22 @@ def normalize_references(state: "GraphState") -> dict[str, Any]:
         reference_id = f"ref-{ref_index + 1:03d}"
 
         # Validate DOI
-        valid_doi, doi_warning = _validate_doi(entry.normalized.doi)
+        valid_doi, doi_warning = _validate_doi(entry.normalized.doi, locale)
         if doi_warning is not None:
             doi_warning["referenceId"] = reference_id
             validation_warnings.append(doi_warning)
 
         # Validate arXiv ID — note: the field uses alias "arxivId" so we access
         # it via the Python attribute name ``arxiv_id``.
-        valid_arxiv, arxiv_warning = _validate_arxiv_id(entry.normalized.arxiv_id)
+        valid_arxiv, arxiv_warning = _validate_arxiv_id(
+            entry.normalized.arxiv_id, locale
+        )
         if arxiv_warning is not None:
             arxiv_warning["referenceId"] = reference_id
             validation_warnings.append(arxiv_warning)
 
         # Validate ISSN
-        valid_issn, issn_warning = _validate_issn(entry.normalized.issn)
+        valid_issn, issn_warning = _validate_issn(entry.normalized.issn, locale)
         if issn_warning is not None:
             issn_warning["referenceId"] = reference_id
             validation_warnings.append(issn_warning)
@@ -205,10 +213,11 @@ def normalize_references(state: "GraphState") -> dict[str, Any]:
         all_warnings.append(
             {
                 "code": "normalization_count_mismatch",
-                "message": (
-                    f"LLM returned {len(result.references)} normalized entries"
-                    f" for {len(raw_references)} input references."
-                    " Some references may not have been processed."
+                "message": render(
+                    "warn.normalization_count_mismatch",
+                    locale,
+                    returned=str(len(result.references)),
+                    expected=str(len(raw_references)),
                 ),
                 "referenceId": None,
                 "details": None,

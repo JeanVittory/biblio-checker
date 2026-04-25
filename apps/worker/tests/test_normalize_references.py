@@ -1,4 +1,5 @@
 """Tests for Step 06 — Normalize References Node."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -84,7 +85,9 @@ def _mock_structured_llm(output: NormalizeReferencesOutput) -> MagicMock:
 class TestNormalNormalization:
     def test_returns_normalized_references_list(self) -> None:
         """Normal call returns a list under 'normalized_references'."""
-        raw = _make_raw_refs("Smith, J. (2020). Title one.", "Doe, A. (2019). Title two.")
+        raw = _make_raw_refs(
+            "Smith, J. (2020). Title one.", "Doe, A. (2019). Title two."
+        )
         output = _make_normalize_output(
             [
                 (0, _make_normalized_fields(title="Title one", year=2020)),
@@ -128,7 +131,11 @@ class TestNormalNormalization:
         """referenceId follows the 'ref-001', 'ref-002' format."""
         raw = _make_raw_refs("A.", "B.", "C.")
         output = _make_normalize_output(
-            [(0, _make_normalized_fields()), (1, _make_normalized_fields()), (2, _make_normalized_fields())]
+            [
+                (0, _make_normalized_fields()),
+                (1, _make_normalized_fields()),
+                (2, _make_normalized_fields()),
+            ]
         )
         mock_llm = _mock_structured_llm(output)
 
@@ -219,7 +226,9 @@ class TestNormalNormalization:
         ):
             normalize_references(_make_state(raw))
 
-        mock_llm.with_structured_output.assert_called_once_with(NormalizeReferencesOutput)
+        mock_llm.with_structured_output.assert_called_once_with(
+            NormalizeReferencesOutput
+        )
 
     def test_single_llm_call_for_all_references(self) -> None:
         """All references are sent in a single LLM call."""
@@ -304,7 +313,10 @@ class TestCountMismatch:
         """References that the LLM did return are still included in output."""
         raw = _make_raw_refs("Ref A.", "Ref B.", "Ref C.")
         output = _make_normalize_output(
-            [(0, _make_normalized_fields(title="Title A")), (2, _make_normalized_fields(title="Title C"))]
+            [
+                (0, _make_normalized_fields(title="Title A")),
+                (2, _make_normalized_fields(title="Title C")),
+            ]
         )
         mock_llm = _mock_structured_llm(output)
 
@@ -367,9 +379,9 @@ class TestDOIValidation:
         "bad_doi",
         [
             "https://doi.org/10.1234/example",  # Full URL — not just the ID
-            "10.123/bad",                        # Less than 4 digits after "10."
+            "10.123/bad",  # Less than 4 digits after "10."
             "not-a-doi",
-            "10.1234",                           # Missing the /suffix part
+            "10.1234",  # Missing the /suffix part
         ],
     )
     def test_invalid_doi_is_discarded_with_warning(self, bad_doi: str) -> None:
@@ -392,9 +404,7 @@ class TestDOIValidation:
     def test_invalid_doi_warning_includes_reference_id(self) -> None:
         """The invalid_doi_format warning has the correct referenceId."""
         raw = _make_raw_refs("A ref.")
-        output = _make_normalize_output(
-            [(0, _make_normalized_fields(doi="bad-doi"))]
-        )
+        output = _make_normalize_output([(0, _make_normalized_fields(doi="bad-doi"))])
         mock_llm = _mock_structured_llm(output)
 
         with patch(
@@ -433,10 +443,10 @@ class TestArxivIDValidation:
     @pytest.mark.parametrize(
         "arxiv_id",
         [
-            "2301.12345",       # New-style, 5 digits
-            "2301.1234",        # New-style, 4 digits
-            "2301.12345v2",     # New-style with version
-            "hep-ph/9901234",   # Old-style
+            "2301.12345",  # New-style, 5 digits
+            "2301.1234",  # New-style, 4 digits
+            "2301.12345v2",  # New-style with version
+            "hep-ph/9901234",  # Old-style
             "math-ph/0201034",  # Old-style different category
         ],
     )
@@ -461,8 +471,8 @@ class TestArxivIDValidation:
         "bad_arxiv",
         [
             "https://arxiv.org/abs/2301.12345",  # Full URL
-            "arxiv:2301.12345",                   # Prefixed
-            "230.12345",                           # Too few digits in YYMM part
+            "arxiv:2301.12345",  # Prefixed
+            "230.12345",  # Too few digits in YYMM part
             "not-an-id",
         ],
     )
@@ -507,9 +517,7 @@ class TestArxivIDValidation:
     def test_none_arxiv_id_passes_without_warning(self) -> None:
         """arxivId=None produces no validation warning."""
         raw = _make_raw_refs("A ref with no arXiv ID.")
-        output = _make_normalize_output(
-            [(0, _make_normalized_fields(arxiv_id=None))]
-        )
+        output = _make_normalize_output([(0, _make_normalized_fields(arxiv_id=None))])
         mock_llm = _mock_structured_llm(output)
 
         with patch(
@@ -538,7 +546,16 @@ class TestArxivIDValidation:
         codes = [w["code"] for w in result["warnings"]]
         assert "invalid_doi_format" in codes
         assert "invalid_arxiv_id_format" in codes
-        assert len([c for c in codes if c in ("invalid_doi_format", "invalid_arxiv_id_format")]) == 2
+        assert (
+            len(
+                [
+                    c
+                    for c in codes
+                    if c in ("invalid_doi_format", "invalid_arxiv_id_format")
+                ]
+            )
+            == 2
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -590,9 +607,7 @@ class TestValidateIssn:
     def test_issn_validation_in_normalize_node_invalid_discarded(self) -> None:
         """An invalid ISSN is set to None and a warning is added in the full node."""
         raw = _make_raw_refs("A ref with bad ISSN.")
-        output = _make_normalize_output(
-            [(0, _make_normalized_fields(issn="00348910"))]
-        )
+        output = _make_normalize_output([(0, _make_normalized_fields(issn="00348910"))])
         mock_llm = _mock_structured_llm(output)
 
         with patch(
@@ -626,9 +641,7 @@ class TestValidateIssn:
     def test_issn_warning_includes_reference_id(self) -> None:
         """The invalid_issn_format warning has the correct referenceId."""
         raw = _make_raw_refs("A ref.")
-        output = _make_normalize_output(
-            [(0, _make_normalized_fields(issn="bad-issn"))]
-        )
+        output = _make_normalize_output([(0, _make_normalized_fields(issn="bad-issn"))])
         mock_llm = _mock_structured_llm(output)
 
         with patch(

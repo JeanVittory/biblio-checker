@@ -35,6 +35,7 @@ def assemble_report(state: GraphState) -> dict:
     classified_references: list[dict] = state["classified_references"]
     total_references_detected: int = state["total_references_detected"]
     warnings: list[dict] = state["warnings"]
+    locale: str = state.get("locale", "es")  # type: ignore[attr-defined]
 
     logger.info(
         "assemble_starting",
@@ -73,7 +74,7 @@ def assemble_report(state: GraphState) -> dict:
 
     payload = {
         "schemaVersion": "1.0",
-        "reportLanguage": "es",
+        "reportLanguage": locale,
         "pipeline": {
             "name": settings.pipeline_name,
             "version": settings.pipeline_version,

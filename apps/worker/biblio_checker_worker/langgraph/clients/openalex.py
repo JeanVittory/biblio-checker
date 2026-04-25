@@ -35,11 +35,13 @@ def _extract_doi(doi_url: str | None) -> str | None:
     if doi_url is None:
         return None
     if doi_url.startswith("https://doi.org/"):
-        return doi_url[len("https://doi.org/"):]
+        return doi_url[len("https://doi.org/") :]
     return doi_url
 
 
-def _parse_work(work: dict[str, Any], match_type: str, raw_score: float) -> MatchCandidate:
+def _parse_work(
+    work: dict[str, Any], match_type: str, raw_score: float
+) -> MatchCandidate:
     openalex_url: str = work.get("id", "")
     external_id = _extract_openalex_id(openalex_url) if openalex_url else ""
     title: str | None = work.get("title") or None
@@ -47,7 +49,9 @@ def _parse_work(work: dict[str, Any], match_type: str, raw_score: float) -> Matc
     authors = [
         a["author"]["display_name"]
         for a in authorships
-        if isinstance(a, dict) and isinstance(a.get("author"), dict) and a["author"].get("display_name")
+        if isinstance(a, dict)
+        and isinstance(a.get("author"), dict)
+        and a["author"].get("display_name")
     ]
     year: int | None = work.get("publication_year")
     doi = _extract_doi(work.get("doi"))
@@ -95,51 +99,101 @@ class OpenAlexClient:
         # Strategy 1: DOI lookup
         if doi is not None:
             if not _validate_doi(doi):
-                logger.debug("search_request", source="openalex", strategy="doi_lookup", skipped=True, reason="invalid_doi_format")
+                logger.debug(
+                    "search_request",
+                    source="openalex",
+                    strategy="doi_lookup",
+                    skipped=True,
+                    reason="invalid_doi_format",
+                )
             else:
-                logger.info("search_starting", source="openalex", strategy="doi_lookup", doi=doi)
+                logger.info(
+                    "search_starting", source="openalex", strategy="doi_lookup", doi=doi
+                )
                 result = self._doi_lookup(doi)
-                logger.info("search_complete", source="openalex", candidates_found=len(result))
+                logger.info(
+                    "search_complete", source="openalex", candidates_found=len(result)
+                )
                 if result:
                     return result
 
         # Strategy 2: Title + Author + Year
         if title is not None and authors and year is not None:
-            logger.info("search_starting", source="openalex", strategy="title_author_year_search", title=title, first_author=authors[0], year=year)
+            logger.info(
+                "search_starting",
+                source="openalex",
+                strategy="title_author_year_search",
+                title=title,
+                first_author=authors[0],
+                year=year,
+            )
             result = self._title_author_year_search(title, authors[0], year)
-            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            logger.info(
+                "search_complete", source="openalex", candidates_found=len(result)
+            )
             if result:
                 return result
 
         # Strategy 3: ISSN + Volume
         if issn is not None and volume is not None:
-            logger.info("search_starting", source="openalex", strategy="issn_volume_search", issn=issn, volume=volume)
+            logger.info(
+                "search_starting",
+                source="openalex",
+                strategy="issn_volume_search",
+                issn=issn,
+                volume=volume,
+            )
             result = self._issn_volume_search(issn, volume)
-            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            logger.info(
+                "search_complete", source="openalex", candidates_found=len(result)
+            )
             if result:
                 return result
 
         # Strategy 4: Title + Year
         if title is not None and year is not None:
-            logger.info("search_starting", source="openalex", strategy="title_year_search", title=title, year=year)
+            logger.info(
+                "search_starting",
+                source="openalex",
+                strategy="title_year_search",
+                title=title,
+                year=year,
+            )
             result = self._title_year_search(title, year)
-            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            logger.info(
+                "search_complete", source="openalex", candidates_found=len(result)
+            )
             if result:
                 return result
 
         # Strategy 5: Author + Title search
         if title is not None and authors:
-            logger.info("search_starting", source="openalex", strategy="author_title_search", title=title, first_author=authors[0])
+            logger.info(
+                "search_starting",
+                source="openalex",
+                strategy="author_title_search",
+                title=title,
+                first_author=authors[0],
+            )
             result = self._author_title_search(title, authors[0])
-            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            logger.info(
+                "search_complete", source="openalex", candidates_found=len(result)
+            )
             if result:
                 return result
 
         # Strategy 6: Title only
         if title is not None:
-            logger.info("search_starting", source="openalex", strategy="title_search", title=title)
+            logger.info(
+                "search_starting",
+                source="openalex",
+                strategy="title_search",
+                title=title,
+            )
             result = self._title_search(title)
-            logger.info("search_complete", source="openalex", candidates_found=len(result))
+            logger.info(
+                "search_complete", source="openalex", candidates_found=len(result)
+            )
             if result:
                 return result
 
@@ -149,7 +203,9 @@ class OpenAlexClient:
     def _doi_lookup(self, doi: str) -> list[MatchCandidate]:
         encoded_doi = urllib.parse.quote(doi, safe="")
         path = f"/works/https://doi.org/{encoded_doi}"
-        logger.debug("search_request", source="openalex", url=str(self._client.base_url) + path)
+        logger.debug(
+            "search_request", source="openalex", url=str(self._client.base_url) + path
+        )
         try:
             response = self._client.get(path)
         except httpx.HTTPStatusError:
@@ -160,73 +216,134 @@ class OpenAlexClient:
         try:
             work = response.json()
         except Exception:
-            logger.warning("search_parse_error", source="openalex", strategy="doi_lookup", detail="malformed JSON")
+            logger.warning(
+                "search_parse_error",
+                source="openalex",
+                strategy="doi_lookup",
+                detail="malformed JSON",
+            )
             return []
         if not isinstance(work, dict):
-            logger.warning("search_parse_error", source="openalex", strategy="doi_lookup", detail="unexpected response shape")
+            logger.warning(
+                "search_parse_error",
+                source="openalex",
+                strategy="doi_lookup",
+                detail="unexpected response shape",
+            )
             return []
         return [_parse_work(work, match_type="doi_exact", raw_score=1.0)]
 
-    def _title_author_year_search(self, title: str, first_author: str, year: int) -> list[MatchCandidate]:
+    def _title_author_year_search(
+        self, title: str, first_author: str, year: int
+    ) -> list[MatchCandidate]:
         """Search by title, first author name, and publication year combined."""
         safe_title = _sanitize_filter_value(title[:500])
         safe_author = _sanitize_filter_value(first_author[:128])
         filter_value = f"title.search:{safe_title},raw_author_name.search:{safe_author},publication_year:{year}"
-        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
-        response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+        logger.debug(
+            "search_request",
+            source="openalex",
+            url=f"{self._client.base_url}/works",
+            params={"filter": filter_value},
+        )
+        response = self._client.get(
+            "/works", params={"filter": filter_value, "per_page": 5}
+        )
         if response.status_code == 404:
             return []
         response.raise_for_status()
-        return self._parse_results_page(response, match_type="metadata_partial", raw_score=0.0)
+        return self._parse_results_page(
+            response, match_type="metadata_partial", raw_score=0.0
+        )
 
     def _issn_volume_search(self, issn: str, volume: str) -> list[MatchCandidate]:
         """Search by journal ISSN and volume number combined."""
         safe_issn = _sanitize_filter_value(issn)
         safe_volume = _sanitize_filter_value(volume[:20])
-        filter_value = f"primary_location.source.issn:{safe_issn},biblio.volume:{safe_volume}"
-        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
-        response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+        filter_value = (
+            f"primary_location.source.issn:{safe_issn},biblio.volume:{safe_volume}"
+        )
+        logger.debug(
+            "search_request",
+            source="openalex",
+            url=f"{self._client.base_url}/works",
+            params={"filter": filter_value},
+        )
+        response = self._client.get(
+            "/works", params={"filter": filter_value, "per_page": 5}
+        )
         if response.status_code == 404:
             return []
         response.raise_for_status()
-        return self._parse_results_page(response, match_type="metadata_partial", raw_score=0.0)
+        return self._parse_results_page(
+            response, match_type="metadata_partial", raw_score=0.0
+        )
 
     def _title_year_search(self, title: str, year: int) -> list[MatchCandidate]:
         """Search by title and publication year combined."""
         safe_title = _sanitize_filter_value(title[:500])
         filter_value = f"title.search:{safe_title},publication_year:{year}"
-        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
-        response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+        logger.debug(
+            "search_request",
+            source="openalex",
+            url=f"{self._client.base_url}/works",
+            params={"filter": filter_value},
+        )
+        response = self._client.get(
+            "/works", params={"filter": filter_value, "per_page": 5}
+        )
         if response.status_code == 404:
             return []
         response.raise_for_status()
-        return self._parse_results_page(response, match_type="title_fuzzy", raw_score=0.0)
+        return self._parse_results_page(
+            response, match_type="title_fuzzy", raw_score=0.0
+        )
 
     def _title_search(self, title: str) -> list[MatchCandidate]:
         safe_title = _sanitize_filter_value(title[:500])
-        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": f"title.search:{safe_title}"})
+        logger.debug(
+            "search_request",
+            source="openalex",
+            url=f"{self._client.base_url}/works",
+            params={"filter": f"title.search:{safe_title}"},
+        )
         try:
-            response = self._client.get("/works", params={"filter": f"title.search:{safe_title}", "per_page": 5})
+            response = self._client.get(
+                "/works", params={"filter": f"title.search:{safe_title}", "per_page": 5}
+            )
         except httpx.HTTPStatusError:
             raise
         if response.status_code == 404:
             return []
         response.raise_for_status()
-        return self._parse_results_page(response, match_type="title_fuzzy", raw_score=0.0)
+        return self._parse_results_page(
+            response, match_type="title_fuzzy", raw_score=0.0
+        )
 
-    def _author_title_search(self, title: str, first_author: str) -> list[MatchCandidate]:
+    def _author_title_search(
+        self, title: str, first_author: str
+    ) -> list[MatchCandidate]:
         safe_title = _sanitize_filter_value(title[:500])
         safe_author = _sanitize_filter_value(first_author[:128])
         filter_value = f"title.search:{safe_title},raw_author_name.search:{safe_author}"
-        logger.debug("search_request", source="openalex", url=f"{self._client.base_url}/works", params={"filter": filter_value})
+        logger.debug(
+            "search_request",
+            source="openalex",
+            url=f"{self._client.base_url}/works",
+            params={"filter": filter_value},
+        )
         try:
-            response = self._client.get("/works", params={"filter": filter_value, "per_page": 5})
+            response = self._client.get(
+                "/works", params={"filter": filter_value, "per_page": 5}
+            )
         except httpx.HTTPStatusError:
             raise
         if response.status_code == 404:
             return []
         response.raise_for_status()
-        return self._parse_results_page(response, match_type="metadata_partial", raw_score=0.0)
+        return self._parse_results_page(
+            response, match_type="metadata_partial", raw_score=0.0
+        )
 
     def _parse_results_page(
         self,
@@ -237,23 +354,39 @@ class OpenAlexClient:
         try:
             data = response.json()
         except Exception:
-            logger.warning("search_parse_error", source="openalex", detail="malformed JSON")
+            logger.warning(
+                "search_parse_error", source="openalex", detail="malformed JSON"
+            )
             return []
         if not isinstance(data, dict):
-            logger.warning("search_parse_error", source="openalex", detail="unexpected response shape")
+            logger.warning(
+                "search_parse_error",
+                source="openalex",
+                detail="unexpected response shape",
+            )
             return []
         results: list[Any] = data.get("results", [])
         if not isinstance(results, list):
-            logger.warning("search_parse_error", source="openalex", detail="results field not a list")
+            logger.warning(
+                "search_parse_error",
+                source="openalex",
+                detail="results field not a list",
+            )
             return []
         candidates: list[MatchCandidate] = []
         for work in results:
             if not isinstance(work, dict):
                 continue
             try:
-                candidates.append(_parse_work(work, match_type=match_type, raw_score=raw_score))
+                candidates.append(
+                    _parse_work(work, match_type=match_type, raw_score=raw_score)
+                )
             except Exception:
-                logger.warning("search_parse_error", source="openalex", detail="could not parse work entry")
+                logger.warning(
+                    "search_parse_error",
+                    source="openalex",
+                    detail="could not parse work entry",
+                )
                 continue
         return candidates
 

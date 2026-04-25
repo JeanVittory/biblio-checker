@@ -1,4 +1,5 @@
 """Unit tests for the assemble_report node (Step 11)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -92,6 +93,7 @@ def _make_state(
     classified: list[dict],
     total_detected: int | None = None,
     warnings: list[dict] | None = None,
+    locale: str = "es",
 ) -> dict:
     """Build a minimal GraphState dict for assemble_report tests."""
     total = total_detected if total_detected is not None else len(classified)
@@ -107,6 +109,7 @@ def _make_state(
         "classified_references": classified,
         "warnings": warnings or [],
         "results_v1": {},
+        "locale": locale,
     }
 
 
@@ -151,7 +154,9 @@ class TestAssembleReport:
     def test_normal_assembly_mixed_classifications(self) -> None:
         """Returns valid ResultsV1 with correct per-classification counts."""
         classified = [
-            _verified_ref("ref-1", "verified", "very_high", 0.98, False, "exact_doi_match"),
+            _verified_ref(
+                "ref-1", "verified", "very_high", 0.98, False, "exact_doi_match"
+            ),
             _verified_ref(
                 "ref-2", "likely_verified", "high", 0.75, False, "strong_metadata_match"
             ),
@@ -166,7 +171,7 @@ class TestAssembleReport:
         assert "results_v1" in result
         rv1 = result["results_v1"]
         assert rv1["schemaVersion"] == "1.0"
-        assert rv1["reportLanguage"] == "es"
+        assert rv1["reportLanguage"] == "es"  # default locale
         assert rv1["pipeline"]["name"] == "biblio-checker"
         assert rv1["pipeline"]["version"] == "0.1.0"
         assert rv1["summary"]["totalReferencesDetected"] == 3
@@ -218,7 +223,9 @@ class TestAssembleReport:
     def test_processing_error_mixed_in_passes_validation(self) -> None:
         """Pre-classified processing_error refs must pass Pydantic validation."""
         classified = [
-            _verified_ref("ref-1", "verified", "high", 0.9, False, "strong_metadata_match"),
+            _verified_ref(
+                "ref-1", "verified", "high", 0.9, False, "strong_metadata_match"
+            ),
             _processing_error_ref("ref-err"),
         ]
         state = _make_state(classified, total_detected=2)
@@ -231,7 +238,9 @@ class TestAssembleReport:
         assert counts["verified"] == 1
         assert counts["processing_error"] == 1
 
-        err_refs = [r for r in rv1["references"] if r["classification"] == "processing_error"]
+        err_refs = [
+            r for r in rv1["references"] if r["classification"] == "processing_error"
+        ]
         assert len(err_refs) == 1
         err = err_refs[0]
         assert err["referenceId"] == "ref-err"
@@ -259,8 +268,12 @@ class TestAssembleReport:
         from pydantic import ValidationError  # noqa: PLC0415
 
         classified = [
-            _verified_ref("dup-id", "verified", "very_high", 0.99, False, "exact_doi_match"),
-            _verified_ref("dup-id", "verified", "very_high", 0.99, False, "exact_doi_match"),
+            _verified_ref(
+                "dup-id", "verified", "very_high", 0.99, False, "exact_doi_match"
+            ),
+            _verified_ref(
+                "dup-id", "verified", "very_high", 0.99, False, "exact_doi_match"
+            ),
         ]
         state = _make_state(classified, total_detected=2)
 
@@ -272,7 +285,9 @@ class TestAssembleReport:
         from pydantic import ValidationError  # noqa: PLC0415
 
         classified = [
-            _verified_ref("ref-1", "verified", "very_high", 0.98, False, "exact_doi_match"),
+            _verified_ref(
+                "ref-1", "verified", "very_high", 0.98, False, "exact_doi_match"
+            ),
             _verified_ref(
                 "ref-2", "verified", "high", 0.90, False, "strong_metadata_match"
             ),
@@ -311,7 +326,9 @@ class TestAssembleReport:
             }
         ]
         classified = [
-            _verified_ref("ref-1", "verified", "high", 0.88, False, "strong_metadata_match"),
+            _verified_ref(
+                "ref-1", "verified", "high", 0.88, False, "strong_metadata_match"
+            ),
         ]
         state = _make_state(classified, total_detected=1, warnings=warnings)
 
@@ -350,7 +367,9 @@ class TestAssembleReport:
     def test_detected_greater_than_analyzed_is_valid(self) -> None:
         """Some refs may fail normalization; detected > analyzed is permitted."""
         classified = [
-            _verified_ref("ref-1", "verified", "very_high", 0.99, False, "exact_doi_match"),
+            _verified_ref(
+                "ref-1", "verified", "very_high", 0.99, False, "exact_doi_match"
+            ),
         ]
         # 5 detected but only 1 survived normalization/verification.
         state = _make_state(classified, total_detected=5)
@@ -360,3 +379,16 @@ class TestAssembleReport:
         rv1 = result["results_v1"]
         assert rv1["summary"]["totalReferencesDetected"] == 5
         assert rv1["summary"]["totalReferencesAnalyzed"] == 1
+
+    # ------------------------------------------------------------------
+    # reportLanguage reflects locale
+    # ------------------------------------------------------------------
+
+    def test_report_language_reflects_locale(self) -> None:
+        """reportLanguage in ResultsV1 must match the locale from state."""
+        for loc in ("es", "pt", "en"):
+            state = _make_state([], total_detected=0, locale=loc)
+            result = _invoke(state)
+            assert result["results_v1"]["reportLanguage"] == loc, (
+                f"Expected reportLanguage={loc!r}"
+            )

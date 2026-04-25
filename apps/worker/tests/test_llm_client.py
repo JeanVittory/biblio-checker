@@ -1,4 +1,5 @@
 """Tests for Step 04 — LLM Client Factory."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

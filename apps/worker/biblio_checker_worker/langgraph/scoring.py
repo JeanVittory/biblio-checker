@@ -26,8 +26,8 @@ def _normalize_title(title: str) -> str:
 def _normalize_author(author: str) -> str:
     author = author.lower()
     author = _AUTHOR_PUNCT_RE.sub("", author)
-    author = _WHITESPACE_RE.sub(" ", author).strip()
-    return author
+    parts = sorted(author.split())
+    return " ".join(parts)
 
 
 def title_similarity(title_a: str | None, title_b: str | None) -> float:
@@ -73,13 +73,21 @@ def author_similarity(authors_a: list[str], authors_b: list[str]) -> float:
 
 
 def _year_similarity(ref_year: int | None, candidate_year: int | None) -> float:
-    """Return year similarity: 1.0 exact, 0.5 off-by-one, 0.0 otherwise or if either is None."""
+    """Return year similarity with gradual degradation for different editions.
+
+    Books often have multiple editions spanning decades (e.g. Kuhn 1962 vs 1986
+    reprint). A strict ±1 tolerance penalizes legitimate re-editions.
+
+    Returns: 1.0 exact, 0.8 ±1-2y, 0.5 ±3-5y, 0.0 beyond or if either is None.
+    """
     if ref_year is None or candidate_year is None:
         return 0.0
     diff = abs(ref_year - candidate_year)
     if diff == 0:
         return 1.0
-    if diff == 1:
+    if diff <= 2:
+        return 0.8
+    if diff <= 5:
         return 0.5
     return 0.0
 

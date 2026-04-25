@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # --- LLM Provider ---
     llm_provider: str = "anthropic"
-    # Valid values: "anthropic", "openai"
+    # Valid values: "anthropic", "openai", "groq"
     # Determines which LangChain chat model class is instantiated.
 
     anthropic_api_key: SecretStr = SecretStr("")
@@ -38,9 +38,14 @@ class Settings(BaseSettings):
     # Required when llm_provider="openai". The OpenAI API key.
     # Use .get_secret_value() when passing to LLM client constructors.
 
+    groq_api_key: SecretStr = SecretStr("")
+    # Required when llm_provider="groq". The Groq API key.
+    # Use .get_secret_value() when passing to LLM client constructors.
+
     llm_model: str = "claude-sonnet-4-20250514"
     # The model identifier passed to the LLM provider.
-    # Default is Claude Sonnet; change to e.g. "gpt-4o" when using OpenAI.
+    # Default is Claude Sonnet; change to e.g. "gpt-4o" (OpenAI) or
+    # "llama-3.3-70b-versatile" (Groq) when using another provider.
 
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     # Temperature for LLM calls. 0.0 for deterministic output.
@@ -60,6 +65,28 @@ class Settings(BaseSettings):
     # Maximum number of references to process per document.
     # Documents exceeding this limit will process only the first N references.
 
+    # --- AI-Enhanced Classification ---
+    ai_adjudication_enabled: bool = True
+    # Master toggle for AI adjudication. When False, the ai_adjudicate node
+    # passes through without making any LLM calls.
+    # Cost impact: adds 1 LLM call per job (batched, only for uncertain references).
+
+    ai_adjudication_max_references: int = Field(default=20, ge=1, le=150)
+    # Maximum number of uncertain references to adjudicate per job.
+    # References are prioritized by lowest confidence score (most uncertain first).
+    # Must be between 1 and 150 (the max_references pipeline cap).
+
+    cross_pattern_analysis_enabled: bool = True
+    # Toggle for cross-reference pattern detection and LLM analysis.
+    # When False, the analyze_cross_patterns node passes through entirely.
+    # Deterministic checks also require this to be True.
+
+    cross_pattern_llm_enabled: bool = True
+    # Toggle for the LLM call within cross-pattern analysis.
+    # When False, deterministic checks still run and produce flags, but no LLM
+    # call is made. Only meaningful when cross_pattern_analysis_enabled is True.
+    # Cost impact: adds 1 LLM call per job (only when patterns are detected).
+
     # --- Pipeline Metadata ---
     pipeline_name: str = "biblio-checker"
     pipeline_version: str = "0.1.0"
@@ -67,20 +94,30 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_llm_provider_key(self) -> "Settings":
-        if self.llm_provider not in ("anthropic", "openai"):
+        if self.llm_provider not in ("anthropic", "openai", "groq"):
             raise ValueError(
-                f"llm_provider must be 'anthropic' or 'openai', got '{self.llm_provider}'"
+                f"llm_provider must be 'anthropic', 'openai', or 'groq', got '{self.llm_provider}'"
             )
         # API key presence is only enforced outside of development to allow local
         # development and testing without provider credentials configured.
         if self.environment != "development":
-            if self.llm_provider == "anthropic" and not self.anthropic_api_key.get_secret_value():
+            if (
+                self.llm_provider == "anthropic"
+                and not self.anthropic_api_key.get_secret_value()
+            ):
                 raise ValueError(
                     "anthropic_api_key must be non-empty when llm_provider='anthropic'"
                 )
-            if self.llm_provider == "openai" and not self.openai_api_key.get_secret_value():
+            if (
+                self.llm_provider == "openai"
+                and not self.openai_api_key.get_secret_value()
+            ):
                 raise ValueError(
                     "openai_api_key must be non-empty when llm_provider='openai'"
+                )
+            if self.llm_provider == "groq" and not self.groq_api_key.get_secret_value():
+                raise ValueError(
+                    "groq_api_key must be non-empty when llm_provider='groq'"
                 )
         return self
 

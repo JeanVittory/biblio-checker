@@ -9,11 +9,13 @@ engine to each reference, and writes the enriched list to
 once after fan-in — using ``verified_references`` here would trigger the
 ``operator.add`` reducer and produce 2N items.
 """
+
 from __future__ import annotations
 
 import structlog
 
 from biblio_checker_worker.langgraph.classification import classify_reference
+from biblio_checker_worker.langgraph.i18n import render
 from biblio_checker_worker.langgraph.schemas import MatchCandidate
 from biblio_checker_worker.langgraph.state import GraphState
 
@@ -77,11 +79,14 @@ def classify_results(state: GraphState) -> dict:
 
         candidates = _candidates_from_dicts(candidate_dicts)
 
+        locale: str = state.get("locale", "es")  # type: ignore[attr-defined]
+
         try:
             classification_result = classify_reference(
                 normalized=normalized,
                 candidates=candidates,
                 source_errors=source_errors,
+                locale=locale,
             )
         except Exception:
             logger.exception(
@@ -94,7 +99,7 @@ def classify_results(state: GraphState) -> dict:
                 "confidenceBand": None,
                 "manualReviewRequired": True,
                 "reasonCode": "reference_processing_failure",
-                "decisionReason": "Ocurrió un error interno al procesar esta referencia.",
+                "decisionReason": render("class.processing_error", locale),
                 "evidence": [],
             }
 

@@ -4,9 +4,13 @@ import re
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from langchain_core.messages import HumanMessage, SystemMessage  # type: ignore[import-untyped]
+from langchain_core.messages import (  # type: ignore[import-untyped]
+    HumanMessage,
+    SystemMessage,
+)
 
 from biblio_checker_worker.langgraph.clients.llm import get_llm
+from biblio_checker_worker.langgraph.i18n import render
 from biblio_checker_worker.langgraph.prompts.parse_references import (
     PARSE_REFERENCES_SYSTEM_PROMPT,
     PARSE_REFERENCES_USER_PROMPT,
@@ -34,7 +38,7 @@ def _has_suspicious_content(text: str) -> bool:
     return any(pattern.search(text) for pattern in _INJECTION_PATTERNS)
 
 
-def parse_references(state: "GraphState") -> dict[str, Any]:
+def parse_references(state: GraphState) -> dict[str, Any]:
     """Extract individual bibliographic references from raw document text.
 
     Reads ``state["raw_text"]``, calls an LLM with structured output to split
@@ -47,6 +51,7 @@ def parse_references(state: "GraphState") -> dict[str, Any]:
         - ``warnings``: (only present when raw_text is empty) list of warning dicts
     """
     raw_text: str = state["raw_text"]
+    locale: str = state.get("locale", "es")  # type: ignore[attr-defined]
 
     if not raw_text or not raw_text.strip():
         logger.warning("parse_references_empty_text")
@@ -56,7 +61,7 @@ def parse_references(state: "GraphState") -> dict[str, Any]:
             "warnings": [
                 {
                     "code": "empty_document",
-                    "message": "El documento no contiene texto extraíble.",
+                    "message": render("warn.empty_document", locale),
                     "referenceId": None,
                     "details": None,
                 }
@@ -70,9 +75,7 @@ def parse_references(state: "GraphState") -> dict[str, Any]:
 
     messages = [
         SystemMessage(content=PARSE_REFERENCES_SYSTEM_PROMPT),
-        HumanMessage(
-            content=PARSE_REFERENCES_USER_PROMPT.format(raw_text=raw_text)
-        ),
+        HumanMessage(content=PARSE_REFERENCES_USER_PROMPT.format(raw_text=raw_text)),
     ]
 
     try:
@@ -82,8 +85,7 @@ def parse_references(state: "GraphState") -> dict[str, Any]:
         raise
 
     raw_references = [
-        {"rawText": ref.raw_text, "index": i}
-        for i, ref in enumerate(result.references)
+        {"rawText": ref.raw_text, "index": i} for i, ref in enumerate(result.references)
     ]
 
     # Post-response validation: containment check and suspicious content check.

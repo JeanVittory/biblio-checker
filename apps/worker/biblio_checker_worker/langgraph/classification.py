@@ -6,15 +6,75 @@ reference based on evidence collected from API lookups.
 
 Classification logic is LLM-free — pure Python decision rules.
 """
+
 from __future__ import annotations
 
+# Ensure catalog is loaded (side-effect import).
+import biblio_checker_worker.langgraph.i18n_catalog.classification as _  # noqa: F401
+from biblio_checker_worker.langgraph.i18n import render
 from biblio_checker_worker.langgraph.schemas import MatchCandidate
 from biblio_checker_worker.langgraph.scoring import title_similarity
+
+# ---------------------------------------------------------------------------
+# Message-building helpers
+# ---------------------------------------------------------------------------
+
+
+def _truncate_title(title: str | None, max_len: int = 80) -> str | None:
+    """Return title truncated to max_len characters (with ellipsis if needed).
+
+    Returns None if title is None.
+    """
+    if title is None:
+        return None
+    if len(title) > max_len:
+        return title[:77] + "..."
+    return title
+
+
+def _score_pct(score: float) -> str:
+    """Convert a 0.0–1.0 float score to an integer percentage string."""
+    return f"{int(score * 100)}%"
+
+
+def _single_candidate_reason(
+    score: float,
+    title: str | None,
+    source: str,
+    *,
+    suffix_key: str,
+    locale: str,
+) -> str:
+    """Build the standard single-candidate decisionReason string.
+
+    Used by Rule 5 and Rule 6 Branch B.
+    ``suffix_key`` is an i18n catalog key resolved via ``render()``.
+    """
+    title_snippet = _truncate_title(title)
+    score_str = _score_pct(score)
+    suffix = render(suffix_key, locale)
+    if title_snippet is not None:
+        return render(
+            "class.match.single.with_title",
+            locale,
+            score=score_str,
+            title=title_snippet,
+            source=source,
+            suffix=suffix,
+        )
+    return render(
+        "class.match.single.no_title",
+        locale,
+        score=score_str,
+        source=source,
+        suffix=suffix,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Evidence assembly
 # ---------------------------------------------------------------------------
+
 
 def _build_evidence(candidates: list[MatchCandidate]) -> list[dict]:
     """Return evidence items for candidates with meaningful scores or exact matches."""
@@ -45,11 +105,13 @@ def _build_evidence(candidates: list[MatchCandidate]) -> list[dict]:
 # Main classification function
 # ---------------------------------------------------------------------------
 
+
 def classify_reference(
     *,
     normalized: dict,
     candidates: list[MatchCandidate],
     source_errors: dict[str, str],
+    locale: str = "es",
 ) -> dict:
     """Classify a reference based on evidence from API lookups.
 
@@ -59,6 +121,7 @@ def classify_reference(
         candidates: All MatchCandidate objects collected from all sources.
         source_errors: Map of source name -> error message for sources
             that failed or timed out.
+        locale: BCP-47 locale code for rendered strings. Defaults to ``"es"``.
 
     Returns:
         dict with keys: classification, confidenceScore, confidenceBand,
@@ -85,15 +148,47 @@ def classify_reference(
                     year_diff is None or year_diff <= 2
                 )
                 if consistent:
+                    _title_snip = _truncate_title(c.title)
+                    _src = c.source
+                    if _title_snip is not None and c.year is not None:
+                        _r1_reason = render(
+                            "class.doi_match.single.with_title_and_year",
+                            locale,
+                            doi=doi,
+                            title=_title_snip,
+                            year=str(c.year),
+                            source=_src,
+                        )
+                    elif _title_snip is not None:
+                        _r1_reason = render(
+                            "class.doi_match.single.with_title_no_year",
+                            locale,
+                            doi=doi,
+                            title=_title_snip,
+                            source=_src,
+                        )
+                    elif c.year is not None:
+                        _r1_reason = render(
+                            "class.doi_match.single.no_title_with_year",
+                            locale,
+                            doi=doi,
+                            year=str(c.year),
+                            source=_src,
+                        )
+                    else:
+                        _r1_reason = render(
+                            "class.doi_match.single.no_title",
+                            locale,
+                            doi=doi,
+                            source=_src,
+                        )
                     return {
                         "classification": "verified",
                         "confidenceScore": 0.95,
                         "confidenceBand": "very_high",
                         "manualReviewRequired": False,
                         "reasonCode": "exact_doi_match",
-                        "decisionReason": (
-                            f"El DOI coincide exactamente con un registro canónico en {c.source}."
-                        ),
+                        "decisionReason": _r1_reason,
                         "evidence": evidence,
                     }
 
@@ -111,15 +206,42 @@ def classify_reference(
                     year_diff is None or year_diff <= 2
                 )
                 if consistent:
+                    _title_snip = _truncate_title(c.title)
+                    if _title_snip is not None and c.year is not None:
+                        _r2_reason = render(
+                            "class.arxiv_match.with_title_and_year",
+                            locale,
+                            arxiv_id=arxiv_id,
+                            title=_title_snip,
+                            year=str(c.year),
+                        )
+                    elif _title_snip is not None:
+                        _r2_reason = render(
+                            "class.arxiv_match.with_title_no_year",
+                            locale,
+                            arxiv_id=arxiv_id,
+                            title=_title_snip,
+                        )
+                    elif c.year is not None:
+                        _r2_reason = render(
+                            "class.arxiv_match.no_title_with_year",
+                            locale,
+                            arxiv_id=arxiv_id,
+                            year=str(c.year),
+                        )
+                    else:
+                        _r2_reason = render(
+                            "class.arxiv_match.no_title",
+                            locale,
+                            arxiv_id=arxiv_id,
+                        )
                     return {
                         "classification": "verified",
                         "confidenceScore": 0.93,
                         "confidenceBand": "very_high",
                         "manualReviewRequired": False,
                         "reasonCode": "exact_identifier_match",
-                        "decisionReason": (
-                            "El identificador arXiv coincide exactamente con un registro en arXiv."
-                        ),
+                        "decisionReason": _r2_reason,
                         "evidence": evidence,
                     }
 
@@ -137,16 +259,83 @@ def classify_reference(
                     year_diff is not None and year_diff > 2
                 )
                 if conflicting:
+                    _matched_snip = _truncate_title(c.title)
+                    _ref_snip = _truncate_title(normalized.get("title"))
+                    _matched_year = c.year
+                    _ref_year = normalized.get("year")
+                    _title_conflict = title_sim < 0.5
+                    _year_conflict = year_diff is not None and year_diff > 2
+
+                    _src = c.source
+                    if _title_conflict and _year_conflict:
+                        if _matched_snip is not None and _ref_snip is not None:
+                            _m_yr_sfx = (
+                                f" ({_matched_year})"
+                                if _matched_year is not None
+                                else ""
+                            )
+                            _r_yr_sfx = (
+                                f" ({_ref_year})" if _ref_year is not None else ""
+                            )
+                            _r3_reason = render(
+                                "class.doi_conflict.both_titles_both_years",
+                                locale,
+                                doi=doi,
+                                matched_title=_matched_snip,
+                                matched_year_suffix=_m_yr_sfx,
+                                source=_src,
+                                ref_title=_ref_snip,
+                                ref_year_suffix=_r_yr_sfx,
+                            )
+                        else:
+                            _r3_reason = render(
+                                "class.doi_conflict.both_titles_both_years.no_snippets",
+                                locale,
+                                doi=doi,
+                                source=_src,
+                            )
+                    elif _title_conflict:
+                        if _matched_snip is not None and _ref_snip is not None:
+                            _r3_reason = render(
+                                "class.doi_conflict.title_only.both_snippets",
+                                locale,
+                                doi=doi,
+                                matched_title=_matched_snip,
+                                source=_src,
+                                ref_title=_ref_snip,
+                            )
+                        else:
+                            _r3_reason = render(
+                                "class.doi_conflict.title_only.no_snippets",
+                                locale,
+                                doi=doi,
+                                source=_src,
+                            )
+                    else:
+                        # year conflict only
+                        if _matched_year is not None and _ref_year is not None:
+                            _r3_reason = render(
+                                "class.doi_conflict.year_only.both_years",
+                                locale,
+                                doi=doi,
+                                matched_year=str(_matched_year),
+                                source=_src,
+                                ref_year=str(_ref_year),
+                            )
+                        else:
+                            _r3_reason = render(
+                                "class.doi_conflict.year_only.no_years",
+                                locale,
+                                doi=doi,
+                                source=_src,
+                            )
                     return {
                         "classification": "suspicious",
                         "confidenceScore": 0.90,
                         "confidenceBand": "high",
                         "manualReviewRequired": True,
                         "reasonCode": "strong_doi_conflict",
-                        "decisionReason": (
-                            "El DOI citado apunta a un trabajo incompatible con el título o año "
-                            "reportados. Esto puede indicar una referencia fabricada."
-                        ),
+                        "decisionReason": _r3_reason,
                         "evidence": evidence,
                     }
 
@@ -159,8 +348,12 @@ def classify_reference(
 
     if len(high_sim_by_source) >= 2:
         source_list = list(high_sim_by_source.values())
-        # Check for conflicting metadata between the best candidates of different sources
+        # Check for conflicting metadata between best candidates of different sources
         conflict_found = False
+        _conflict_best_i: MatchCandidate | None = None
+        _conflict_best_j: MatchCandidate | None = None
+        _conflict_year: bool = False
+        _conflict_doi: bool = False
         for i in range(len(source_list)):
             best_i = max(source_list[i], key=lambda c: c.raw_score)
             for j in range(i + 1, len(source_list)):
@@ -178,20 +371,46 @@ def classify_reference(
                 )
                 if year_conflict or doi_conflict:
                     conflict_found = True
+                    _conflict_best_i = best_i
+                    _conflict_best_j = best_j
+                    _conflict_year = year_conflict
+                    _conflict_doi = doi_conflict
                     break
             if conflict_found:
                 break
 
-        if conflict_found:
+        _ci = _conflict_best_i
+        _cj = _conflict_best_j
+        if conflict_found and _ci is not None and _cj is not None:
+            _source_a = _ci.source
+            _source_b = _cj.source
+            if _conflict_year and _conflict_doi:
+                _conflict_detail = render(
+                    "class.cross_source_conflict.detail.years_and_dois", locale
+                )
+            elif _conflict_year:
+                _conflict_detail = render(
+                    "class.cross_source_conflict.detail.years",
+                    locale,
+                    year_a=str(_ci.year),
+                    year_b=str(_cj.year),
+                )
+            else:
+                _conflict_detail = render(
+                    "class.cross_source_conflict.detail.dois", locale
+                )
             return {
                 "classification": "suspicious",
                 "confidenceScore": 0.85,
                 "confidenceBand": "high",
                 "manualReviewRequired": True,
                 "reasonCode": "cross_source_metadata_conflict",
-                "decisionReason": (
-                    "Múltiples fuentes encontraron trabajos similares pero con metadatos "
-                    "contradictorios entre sí."
+                "decisionReason": render(
+                    "class.cross_source_conflict",
+                    locale,
+                    source_a=_source_a,
+                    source_b=_source_b,
+                    conflict_detail=_conflict_detail,
                 ),
                 "evidence": evidence,
             }
@@ -209,9 +428,12 @@ def classify_reference(
             "confidenceBand": confidence_band,
             "manualReviewRequired": False,
             "reasonCode": "strong_metadata_match",
-            "decisionReason": (
-                f"Se encontró una coincidencia fuerte por título y autores en {best.source}, "
-                "aunque sin identificador canónico."
+            "decisionReason": _single_candidate_reason(
+                best_score,
+                best.title,
+                best.source,
+                suffix_key="class.strong_metadata.suffix",
+                locale=locale,
             ),
             "evidence": evidence,
         }
@@ -230,9 +452,12 @@ def classify_reference(
             "confidenceBand": confidence_band,
             "manualReviewRequired": True,
             "reasonCode": "single_moderate_match",
-            "decisionReason": (
-                "Se encontró un candidato con coincidencia moderada, pero no suficiente para "
-                "confirmar la referencia."
+            "decisionReason": _single_candidate_reason(
+                best_score,
+                best.title,
+                best.source,
+                suffix_key="class.weak_metadata.suffix",
+                locale=locale,
             ),
             "evidence": evidence,
         }
@@ -245,16 +470,32 @@ def classify_reference(
         # Top two are within 0.15 of each other — no single dominant candidate
         if top_score - second_score <= 0.15:
             confidence_band = "medium" if top_score >= 0.65 else "low"
+            _top1 = sorted_plausible[0]
+            _top2 = sorted_plausible[1]
+            _t1_snip = _truncate_title(_top1.title) or render(
+                "class.no_title_placeholder", locale
+            )
+            _t2_snip = _truncate_title(_top2.title) or render(
+                "class.no_title_placeholder", locale
+            )
+            _r6a_reason = render(
+                "class.ambiguous_multi",
+                locale,
+                count=str(len(plausible)),
+                title1=_t1_snip,
+                score1=_score_pct(top_score),
+                source1=_top1.source,
+                title2=_t2_snip,
+                score2=_score_pct(second_score),
+                source2=_top2.source,
+            )
             return {
                 "classification": "ambiguous",
                 "confidenceScore": top_score,
                 "confidenceBand": confidence_band,
                 "manualReviewRequired": True,
                 "reasonCode": "multiple_plausible_candidates",
-                "decisionReason": (
-                    "Se encontraron múltiples candidatos plausibles pero ninguno es lo "
-                    "suficientemente concluyente."
-                ),
+                "decisionReason": _r6a_reason,
                 "evidence": evidence,
             }
         # One candidate clearly dominates — fall through to strong match check
@@ -268,9 +509,12 @@ def classify_reference(
                 "confidenceBand": confidence_band,
                 "manualReviewRequired": False,
                 "reasonCode": "strong_metadata_match",
-                "decisionReason": (
-                    f"Se encontró una coincidencia fuerte por título y autores en {best.source}, "
-                    "aunque sin identificador canónico."
+                "decisionReason": _single_candidate_reason(
+                    best_score,
+                    best.title,
+                    best.source,
+                    suffix_key="class.strong_metadata.suffix",
+                    locale=locale,
                 ),
                 "evidence": evidence,
             }
@@ -283,10 +527,7 @@ def classify_reference(
             "confidenceBand": "very_low",
             "manualReviewRequired": True,
             "reasonCode": "insufficient_metadata",
-            "decisionReason": (
-                "La referencia no contiene metadatos suficientes (título, DOI o identificador) "
-                "para realizar una búsqueda confiable."
-            ),
+            "decisionReason": render("class.insufficient_metadata", locale),
             "evidence": evidence,
         }
 
@@ -300,9 +541,7 @@ def classify_reference(
             "confidenceBand": "very_low",
             "manualReviewRequired": True,
             "reasonCode": "source_timeout_partial",
-            "decisionReason": (
-                "Algunas fuentes no respondieron a tiempo. Los resultados pueden ser incompletos."
-            ),
+            "decisionReason": render("class.source_timeout_not_found", locale),
             "evidence": evidence,
         }
 
@@ -314,9 +553,6 @@ def classify_reference(
         "confidenceBand": confidence_band,
         "manualReviewRequired": True,
         "reasonCode": "no_match_any_source",
-        "decisionReason": (
-            "No se encontraron coincidencias en ninguna fuente consultada "
-            "(OpenAlex, SciELO, arXiv)."
-        ),
+        "decisionReason": render("class.not_found", locale),
         "evidence": evidence,
     }

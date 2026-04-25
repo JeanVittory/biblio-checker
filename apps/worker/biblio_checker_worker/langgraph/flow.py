@@ -10,6 +10,7 @@ Provides ``start_analysis_flow()`` which:
 The compiled graph is cached at module level — the graph structure is
 stateless, so a single compiled instance is safe to reuse across jobs.
 """
+
 from __future__ import annotations
 
 import structlog
@@ -85,6 +86,7 @@ def start_analysis_flow(
             "job_id": str(job.id),
             "source_type": job.source_type,
             "file_bytes": file_bytes,
+            "locale": job.locale,
         }
 
         graph = _get_graph()

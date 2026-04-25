@@ -11,7 +11,9 @@ from biblio_checker_worker.core.config import get_settings
 if TYPE_CHECKING:
     from biblio_checker_worker.langgraph.state import GraphState
 
-logger = structlog.stdlib.get_logger("biblio_checker_worker.langgraph.nodes.extract_text")
+logger = structlog.stdlib.get_logger(
+    "biblio_checker_worker.langgraph.nodes.extract_text"
+)
 
 
 def extract_text(state: "GraphState") -> dict[str, Any]:

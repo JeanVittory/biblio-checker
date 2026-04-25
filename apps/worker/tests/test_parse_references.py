@@ -1,4 +1,5 @@
 """Tests for Step 05 — Parse References Node."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -23,9 +24,7 @@ def _make_state(raw_text: str = "") -> dict:
 
 def _make_parse_output(refs: list[str]) -> ParseReferencesOutput:
     """Build a ParseReferencesOutput from a list of reference text strings."""
-    return ParseReferencesOutput(
-        references=[ParsedReference(raw_text=t) for t in refs]
-    )
+    return ParseReferencesOutput(references=[ParsedReference(raw_text=t) for t in refs])
 
 
 def _mock_structured_llm(output: ParseReferencesOutput) -> MagicMock:
