@@ -1,31 +1,54 @@
 ---
 name: pipeline-graph-state
-description: GraphState TypedDict schema, reducer strategy, node topology, and fan-out/fan-in design for the LangGraph biblio-checker pipeline
+description: GraphState schema, reducer strategy, node topology, and i18n locale threading (updated i18n slice)
 type: project
 ---
 
-`GraphState` is defined in `apps/worker/biblio_checker_worker/langgraph/state.py`.
+## GraphState schema (`apps/worker/biblio_checker_worker/langgraph/state.py`)
 
-## Reducer strategy
+Inputs (set once at graph invocation):
+- `job_id: str` — UUID
+- `source_type: str` — "pdf" | "docx"
+- `file_bytes: bytes` — raw document bytes
+- `locale: str` — BCP-47 locale ("es"|"pt"|"en"), set from `AnalysisJob.locale`, never mutated
 
-Fields that use `Annotated[list[dict], operator.add]` (fan-out accumulation):
-- `normalized_references` — written by normalize_references
-- `verified_references` — written by verify_single_reference (parallel Send() invocations)
-- `warnings` — accumulated by any node
+After extract_text: `raw_text: str`
 
-Fields with NO reducer (plain types, overwritten):
-- `job_id`, `source_type`, `file_bytes` — inputs
-- `raw_text` — extract_text node
-- `raw_references`, `total_references_detected` — parse_references node
-- `classified_references` — classify_results node (plain list, NOT operator.add, to prevent double-accumulation since classify_results runs once after fan-in)
-- `results_v1` — assemble_report node
+After parse_references: `raw_references: list[dict]`, `total_references_detected: int`
 
-## Graph topology (6 nodes)
+After normalize_references: `normalized_references: Annotated[list[dict], operator.add]`
 
-```
+After verify_single_reference (fan-out): `verified_references: Annotated[list[dict], operator.add]`
+
+After classify_results: `classified_references: list[dict]` (plain, no reducer)
+
+After analyze_cross_patterns: `cross_reference_analysis: dict`
+
+Accumulated: `warnings: Annotated[list[dict], operator.add]`
+
+After assemble_report: `results_v1: dict`
+
+## Node topology
+
 START → extract_text → parse_references → normalize_references
-      → verify_single_reference (fan-out via Send(), N parallel)
-      → classify_results (fan-in) → assemble_report → END
-```
+→ [fan_out_verify] → verify_single_reference (×N, parallel)
+→ classify_results → analyze_cross_patterns → ai_adjudicate → assemble_report → END
 
-**Why:** `classified_references` was deliberately kept as a plain list (no reducer) because `classify_results` runs once after fan-in; using `operator.add` there would cause double-accumulation.
+Fan-out uses `Send()` — one per normalized reference. Each Send() partial state includes `locale`.
+
+## Key reducer strategy
+
+`normalized_references`, `verified_references`, `warnings` use `operator.add` (fan-out accumulation).
+`classified_references` is plain (no reducer) — written once by classify_results after fan-in.
+`cross_reference_analysis` is plain — written once.
+
+## i18n integration (Steps 05-07)
+
+- `locale` comes from `AnalysisJob.locale` (added to `_FIELDS` whitelist + `from_row()` with `filtered.get("locale") or "es"`)
+- `flow.py` threads it into initial_state: `"locale": job.locale`
+- `fan_out_verify` adds `"locale": locale` to each Send() partial state
+- All nodes read `state.get("locale", "es")` defensively
+- `assemble_report` uses `locale` for `reportLanguage` (widened from `^es$` to `^(es|pt|en)$`)
+
+**Why:** locale is set once at job creation time (immutable), threaded through the entire graph so every user-facing string renders in the chosen language.
+**How to apply:** Any new node that builds decisionReason or warning messages must read `state.get("locale", "es")` and pass it to `render()`.
