@@ -38,6 +38,28 @@
     "uploadTooltip": "Coming soon — analysis with your own document will be enabled shortly",
     "tryDemoInstead": "In the meantime, try with the example"
   },
+  "app": {
+    "tabs": {
+      "upload": "Upload document",
+      "paste": "Paste citation",
+      "aria_label": "Input mode"
+    }
+  },
+  "paste": {
+    "label": "Paste your bibliographic citation",
+    "placeholder": "Ex.: García, M. (2023). Article title. Journal of Studies, 12(3), 45-67. https://doi.org/...",
+    "helper": "Paste a single citation (between 20 and 2000 characters).",
+    "counter": "{count} / 2000",
+    "too_short": "The citation must be at least 20 characters long.",
+    "too_long": "The citation cannot exceed 2000 characters.",
+    "empty": "Paste a citation to verify it.",
+    "submit": "Verify",
+    "submitting": "Sending for analysis…",
+    "success": "Citation submitted. You'll see it in Recent Analyses.",
+    "submit_failed": "Could not submit the citation. Check your connection and try again.",
+    "backend_error": "The server rejected the request. {message}",
+    "storage_full": "Your browser is out of space to save the new entry in Recent Analyses. The citation was submitted, but delete older entries to see it."
+  },
   "recent": {
     "title": "Recent Analyses",
     "empty_state": "No analyses yet. Upload a file to get started.",
@@ -51,6 +73,16 @@
       "view_details": "View details",
       "hide_details": "Hide details",
       "remove_job": "Remove job"
+    },
+    "badge": {
+      "text": "Text",
+      "text_tooltip": "Citation pasted as text",
+      "pdf": "PDF",
+      "pdf_tooltip": "PDF document",
+      "docx": "DOCX",
+      "docx_tooltip": "DOCX document",
+      "document": "Document",
+      "document_tooltip": "Uploaded document"
     }
   },
   "status": {
@@ -168,6 +200,7 @@
     "analysis_start_failed": "Could not start analysis. Please try again.",
     "status_fetch_failed": "Could not refresh job status.",
     "network_error": "Network error. Check your connection and retry.",
+    "service_offline": "The service is temporarily unavailable. This is not a problem with your browser or the app — our team has been notified. Please try again in a few minutes, or reach out to the team if the issue persists.",
     "invalid_results_format": "Results format is invalid or unsupported.",
     "pdf_generation_failed": "PDF generation failed. Please try again."
   },

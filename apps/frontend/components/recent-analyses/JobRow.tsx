@@ -8,6 +8,85 @@ import { StatusBadge } from "./StatusBadge";
 import { ExpandedDetail } from "./ExpandedDetail";
 import type { StoredJob } from "@/lib/localStorage/recentAnalyses";
 
+// ---------------------------------------------------------------------------
+// InputKindBadge — small pill distinguishing upload mode from paste mode
+// ---------------------------------------------------------------------------
+
+interface InputKindBadgeProps {
+  job: StoredJob;
+}
+
+function InputKindBadge({ job }: InputKindBadgeProps) {
+  const t = useTranslations("recent.badge");
+  const inputKind = job.inputKind ?? "file";
+
+  if (inputKind === "text") {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+          "bg-accent/10 text-accent border border-accent/20"
+        )}
+        aria-label={t("text_tooltip")}
+        title={t("text_tooltip")}
+      >
+        {/* i18n key: recent.badge.text */}
+        {t("text")}
+      </span>
+    );
+  }
+
+  // File mode — infer PDF / DOCX from the display name extension.
+  const displayName = job.fileName ?? "";
+  const lower = displayName.toLowerCase();
+
+  if (lower.endsWith(".pdf")) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+          "bg-muted/20 text-muted border border-border"
+        )}
+        aria-label={t("pdf_tooltip")}
+        title={t("pdf_tooltip")}
+      >
+        {/* i18n key: recent.badge.pdf */}
+        {t("pdf")}
+      </span>
+    );
+  }
+
+  if (lower.endsWith(".docx")) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+          "bg-muted/20 text-muted border border-border"
+        )}
+        aria-label={t("docx_tooltip")}
+        title={t("docx_tooltip")}
+      >
+        {/* i18n key: recent.badge.docx */}
+        {t("docx")}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+        "bg-muted/20 text-muted border border-border"
+      )}
+      aria-label={t("document_tooltip")}
+      title={t("document_tooltip")}
+    >
+      {/* i18n key: recent.badge.document */}
+      {t("document")}
+    </span>
+  );
+}
+
 export interface JobRowProps {
   job: StoredJob;
   onRemove: (jobId: string) => void;
@@ -58,9 +137,28 @@ export function JobRow({ job, onRemove }: JobRowProps) {
         // The row itself is not focusable — the toggle button inside handles
         // keyboard navigation.
       >
-        {/* File name */}
-        <td className="px-4 py-3 text-sm text-foreground max-w-[200px] truncate">
-          <span title={job.fileName}>{job.fileName}</span>
+        {/* Display name + input-kind badge */}
+        <td className="px-4 py-3 text-sm text-foreground max-w-[200px]">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <InputKindBadge job={job} />
+            {/*
+             * User-supplied; React text-node escaping is the only XSS defense.
+             * For text-mode rows, rawTextPreview (up to 500 chars) is used as the
+             * tooltip so the user can see the full citation on hover.
+             * For file-mode rows, the displayName itself is the tooltip.
+             */}
+            <span
+              className="truncate"
+              title={
+                (job.inputKind ?? "file") === "text" && job.rawTextPreview !== undefined
+                  ? job.rawTextPreview
+                  : job.fileName
+              }
+            >
+              {/* User-supplied; React text-node escaping is the only XSS defense. */}
+              {job.fileName}
+            </span>
+          </div>
         </td>
 
         {/* Submitted at */}

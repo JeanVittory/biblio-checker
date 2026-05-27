@@ -72,6 +72,14 @@ PROBLEM_DEFS: dict[str, ProblemDef] = {
         title="Analysis job creation failed",
         default_detail="The server could not create the analysis job.",
     ),
+    "service_offline": ProblemDef(
+        status=503,
+        title="Service temporarily unavailable",
+        default_detail=(
+            "The service is temporarily unavailable. Please try again later "
+            "or contact the team if the issue persists."
+        ),
+    ),
 }
 
 

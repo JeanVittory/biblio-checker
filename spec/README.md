@@ -24,3 +24,4 @@ Each feature lives in `spec/<feature>/` and typically includes:
 - `spec/momento-wow/` — “Momento Wow” (Authenticity Score 0-100 with color semaphore, “Try with example” sample document for zero-friction first use, client-side PDF/CSV export for shareable reports).
 - `spec/share-link/` — “Share Link” (on-demand public share URLs for completed analyses: share token generation, public read endpoint, `/r/[shareToken]` page, clipboard copy with visual feedback, 7-day TTL).
 - `spec/landing-page/` — “Landing Page” (marketing home at `/` with hero, problem, how-it-works, live demo, use cases, and sources sections; route restructure moving uploader to `/app`; `?sample=1` auto-load flow).
+- `spec/single-reference-text-check/` — “Single Reference Text Check” (paste-a-citation entry path: `input_kind` discriminator on `analysis_jobs`, `POST /api/analysis/start-text`, worker pipeline branch skipping file extraction, tabs UI on `/app`, input-kind badge in Recent Analyses).
