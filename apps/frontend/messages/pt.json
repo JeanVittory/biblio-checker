@@ -38,6 +38,28 @@
     "uploadTooltip": "Em breve — a análise com seu próprio documento será habilitada em breve",
     "tryDemoInstead": "Enquanto isso, experimente com o exemplo"
   },
+  "app": {
+    "tabs": {
+      "upload": "Enviar documento",
+      "paste": "Colar citação",
+      "aria_label": "Modo de entrada"
+    }
+  },
+  "paste": {
+    "label": "Cole sua citação bibliográfica",
+    "placeholder": "Ex.: García, M. (2023). Título do artigo. Revista de Estudos, 12(3), 45-67. https://doi.org/...",
+    "helper": "Cole uma única citação (entre 20 e 2000 caracteres).",
+    "counter": "{count} / 2000",
+    "too_short": "A citação deve ter pelo menos 20 caracteres.",
+    "too_long": "A citação não pode exceder 2000 caracteres.",
+    "empty": "Cole uma citação para verificar.",
+    "submit": "Verificar",
+    "submitting": "Enviando para análise…",
+    "success": "Citação enviada. Você a verá em Análises Recentes.",
+    "submit_failed": "Não foi possível enviar a citação. Verifique sua conexão e tente novamente.",
+    "backend_error": "O servidor rejeitou a solicitação. {message}",
+    "storage_full": "Seu navegador não tem espaço para salvar a nova entrada em Análises Recentes. A citação foi enviada com sucesso, mas exclua entradas antigas para vê-la."
+  },
   "recent": {
     "title": "Análises recentes",
     "empty_state": "Nenhuma análise ainda. Envie um arquivo para começar.",
@@ -51,6 +73,16 @@
       "view_details": "Ver detalhes",
       "hide_details": "Ocultar detalhes",
       "remove_job": "Remover tarefa"
+    },
+    "badge": {
+      "text": "Texto",
+      "text_tooltip": "Citação colada como texto",
+      "pdf": "PDF",
+      "pdf_tooltip": "Documento PDF",
+      "docx": "DOCX",
+      "docx_tooltip": "Documento DOCX",
+      "document": "Documento",
+      "document_tooltip": "Documento carregado"
     }
   },
   "status": {
@@ -168,6 +200,7 @@
     "analysis_start_failed": "Não foi possível iniciar a análise. Por favor, tente novamente.",
     "status_fetch_failed": "Não foi possível atualizar o status da tarefa.",
     "network_error": "Erro de rede. Verifique sua conexão e tente novamente.",
+    "service_offline": "O serviço não está disponível neste momento. Não é um problema do seu navegador nem do app — nossa equipe já foi notificada. Tente novamente em alguns minutos ou entre em contato com a equipe se o problema persistir.",
     "invalid_results_format": "O formato dos resultados é inválido ou não suportado.",
     "pdf_generation_failed": "Falha ao gerar o PDF. Por favor, tente novamente."
   },

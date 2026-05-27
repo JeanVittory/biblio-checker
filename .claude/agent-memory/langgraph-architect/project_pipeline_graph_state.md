@@ -8,8 +8,8 @@ type: project
 
 Inputs (set once at graph invocation):
 - `job_id: str` — UUID
-- `source_type: str` — "pdf" | "docx"
-- `file_bytes: bytes` — raw document bytes
+- `source_type: NotRequired[str]` — "pdf" | "docx" (Step 04: optional for text-mode jobs)
+- `file_bytes: NotRequired[bytes]` — raw document bytes (Step 04: optional for text-mode jobs)
 - `locale: str` — BCP-47 locale ("es"|"pt"|"en"), set from `AnalysisJob.locale`, never mutated
 
 After extract_text: `raw_text: str`
@@ -52,3 +52,11 @@ Fan-out uses `Send()` — one per normalized reference. Each Send() partial stat
 
 **Why:** locale is set once at job creation time (immutable), threaded through the entire graph so every user-facing string renders in the chosen language.
 **How to apply:** Any new node that builds decisionReason or warning messages must read `state.get("locale", "es")` and pass it to `render()`.
+
+## Step 04: Text-mode subgraph (flow.py)
+
+A separate `_compiled_text_graph` is built by `_build_text_graph()` — topology is START → normalize_references → fan_out_verify → verify_single_reference → classify_results → analyze_cross_patterns → ai_adjudicate → assemble_report → END.
+
+Initial state for text-mode: `{job_id, locale, raw_text, raw_references: [{index:0, rawText:...}], warnings:[], total_references_detected:1}`. No `file_bytes` or `source_type`.
+
+`fan_out_verify` from `graph.py` is reused directly — it works because it reads `normalized_references` from state after normalize_references runs, same as in file-mode.

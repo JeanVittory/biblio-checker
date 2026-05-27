@@ -3,6 +3,31 @@ import { EXTRACT_MODES, MIME_TYPES, SOURCE_TYPES, STORAGE_PROVIDERS } from "@/li
 
 export const extractModeSchema = z.literal(EXTRACT_MODES.BACKEND_EXTRACT_REFERENCES);
 
+// ---------------------------------------------------------------------------
+// Text-reference check schema (Step 05)
+// ---------------------------------------------------------------------------
+
+/**
+ * Strict schema for the text-mode gateway request body.
+ * .strict() rejects any extra fields (e.g. a client-supplied locale override).
+ * The null-byte regex closes a secondary injection vector.
+ */
+export const textReferenceCheckSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    reference: z.object({
+      rawText: z
+        .string()
+        .trim()
+        .min(20)
+        .max(2000)
+        .regex(/^[^\x00]*$/, "null bytes not allowed"),
+    }),
+  })
+  .strict();
+
+export type TextReferenceCheckPayload = z.infer<typeof textReferenceCheckSchema>;
+
 export const sourceTypeSchema = z.union([
   z.literal(SOURCE_TYPES.PDF),
   z.literal(SOURCE_TYPES.DOCX),

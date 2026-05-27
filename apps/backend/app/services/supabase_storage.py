@@ -11,6 +11,7 @@ from storage3.exceptions import StorageApiError
 
 from app.core.config import settings
 from app.core.supabase_client import SupabaseClientError, get_supabase_admin_client
+from app.services._db_failure_classifier import is_service_offline_exception
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -67,6 +68,8 @@ async def _create_signed_download_url(*, bucket: str, path: str) -> str:
             err = SupabaseStorageError(code="storage_not_found", detail=exc.message)
         elif status in ("401", "403"):
             err = SupabaseStorageError(code="storage_unauthorized", detail=exc.message)
+        elif status in ("502", "503", "504"):
+            err = SupabaseStorageError(code="service_offline", detail=exc.message)
         else:
             err = SupabaseStorageError(
                 code="storage_download_failed",
@@ -79,9 +82,12 @@ async def _create_signed_download_url(*, bucket: str, path: str) -> str:
         )
         raise err from exc
     except httpx.HTTPError as exc:
-        err = SupabaseStorageError(
-            code="storage_download_failed", detail=str(exc) or None
+        code = (
+            "service_offline"
+            if is_service_offline_exception(exc)
+            else "storage_download_failed"
         )
+        err = SupabaseStorageError(code=code, detail=str(exc) or None)
         logger.error(
             "storage_error",
             error_code=err.code,
@@ -89,9 +95,12 @@ async def _create_signed_download_url(*, bucket: str, path: str) -> str:
         )
         raise err from exc
     except Exception as exc:  # noqa: BLE001
-        err = SupabaseStorageError(
-            code="storage_download_failed", detail=str(exc) or None
+        code = (
+            "service_offline"
+            if is_service_offline_exception(exc)
+            else "storage_download_failed"
         )
+        err = SupabaseStorageError(code=code, detail=str(exc) or None)
         logger.error(
             "storage_error",
             error_code=err.code,
@@ -113,6 +122,8 @@ async def download_object_bytes(bucket: str, path: str) -> bytes:
                     raise SupabaseStorageError(code="storage_not_found")
                 if resp.status_code in (401, 403):
                     raise SupabaseStorageError(code="storage_unauthorized")
+                if resp.status_code in (502, 503, 504):
+                    raise SupabaseStorageError(code="service_offline")
                 if resp.status_code >= 400:
                     status_code = resp.status_code
                     raise SupabaseStorageError(
@@ -150,9 +161,12 @@ async def download_object_bytes(bucket: str, path: str) -> bytes:
         )
         raise
     except httpx.HTTPError as exc:
-        err = SupabaseStorageError(
-            code="storage_download_failed", detail=str(exc) or None
+        code = (
+            "service_offline"
+            if is_service_offline_exception(exc)
+            else "storage_download_failed"
         )
+        err = SupabaseStorageError(code=code, detail=str(exc) or None)
         logger.error(
             "storage_error",
             error_code=err.code,
@@ -189,14 +203,21 @@ def compute_object_sha256(bucket: str, path: str) -> str:
             raise SupabaseStorageError(
                 code="storage_unauthorized", detail=exc.message
             ) from exc
+        if status in ("502", "503", "504"):
+            raise SupabaseStorageError(
+                code="service_offline", detail=exc.message
+            ) from exc
         raise SupabaseStorageError(
             code="storage_download_failed",
             detail=f"Signed URL generation failed with status {exc.status}.",
         ) from exc
     except httpx.HTTPError as exc:
-        raise SupabaseStorageError(
-            code="storage_download_failed", detail=str(exc) or None
-        ) from exc
+        code = (
+            "service_offline"
+            if is_service_offline_exception(exc)
+            else "storage_download_failed"
+        )
+        raise SupabaseStorageError(code=code, detail=str(exc) or None) from exc
 
     try:
         with httpx.Client(
@@ -208,6 +229,8 @@ def compute_object_sha256(bucket: str, path: str) -> str:
                     raise SupabaseStorageError(code="storage_not_found")
                 if resp.status_code in (401, 403):
                     raise SupabaseStorageError(code="storage_unauthorized")
+                if resp.status_code in (502, 503, 504):
+                    raise SupabaseStorageError(code="service_offline")
                 if resp.status_code >= 400:
                     status_code = resp.status_code
                     raise SupabaseStorageError(
@@ -236,6 +259,9 @@ def compute_object_sha256(bucket: str, path: str) -> str:
 
                 return digest.hexdigest()
     except httpx.HTTPError as exc:
-        raise SupabaseStorageError(
-            code="storage_download_failed", detail=str(exc) or None
-        ) from exc
+        code = (
+            "service_offline"
+            if is_service_offline_exception(exc)
+            else "storage_download_failed"
+        )
+        raise SupabaseStorageError(code=code, detail=str(exc) or None) from exc

@@ -17,6 +17,12 @@ export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "expired
 export interface StoredJob {
   jobId: string;
   jobToken: string;
+  /**
+   * Display name shown in the Recent Analyses table.
+   * For file-mode jobs this is the original file name.
+   * For text-mode jobs this is the first 60 chars of the pasted text (+ ellipsis).
+   * Kept as `fileName` in the persisted schema for backwards compatibility.
+   */
   fileName: string;
   /** ISO 8601 */
   submittedAt: string;
@@ -26,6 +32,19 @@ export interface StoredJob {
   error: string | null;
   /** ISO 8601 or null */
   completedAt: string | null;
+  /**
+   * Discriminates between the two job entry modes.
+   * Defaults to "file" for legacy entries that pre-date this field.
+   * Optional in the type so that old persisted rows (which lack this key) still
+   * satisfy the interface; `readJobs` fills in "file" for any missing value.
+   */
+  inputKind?: "file" | "text";
+  /**
+   * Trimmed paste text capped at 500 chars. Present only for text-mode jobs.
+   * Used as the hover tooltip in the Recent Analyses table.
+   * User-supplied; React text-node escaping is the only XSS defense at every render site.
+   */
+  rawTextPreview?: string;
 }
 
 interface LocalStorageData {
@@ -80,6 +99,11 @@ function parseStorageData(raw: string | null): LocalStorageData | null {
  * - If the localStorage entry is absent, returns [].
  * - If the entry is present but corrupted or has an unknown schema version,
  *   logs a warning and returns [].
+ *
+ * Backwards compatibility: rows written before the `inputKind` / `rawTextPreview`
+ * fields were added are patched defensively:
+ *   - missing `inputKind` → defaults to "file"
+ *   - missing `rawTextPreview` → stays undefined
  */
 export function readJobs(): StoredJob[] {
   if (typeof window === "undefined") return [];
@@ -94,7 +118,12 @@ export function readJobs(): StoredJob[] {
     return [];
   }
 
-  return data.jobs;
+  // Patch legacy rows that lack the new fields.
+  return data.jobs.map((job) => ({
+    ...job,
+    inputKind: (job as StoredJob).inputKind ?? "file",
+    rawTextPreview: (job as StoredJob).rawTextPreview,
+  }));
 }
 
 /**
@@ -117,20 +146,46 @@ export function writeJobs(jobs: StoredJob[]): void {
 }
 
 /**
+ * Options for addJob — extends the signature without breaking existing callers.
+ */
+export interface AddJobOptions {
+  /** Discriminates the job entry mode. Defaults to "file". */
+  inputKind?: "file" | "text";
+  /**
+   * Trimmed paste preview capped at 500 chars.
+   * Only relevant for text-mode jobs; omit for file-mode.
+   */
+  rawTextPreview?: string;
+}
+
+/**
  * Creates a new job with status "queued", prepends it to the stored list,
  * persists the list, and returns the newly created job.
+ *
+ * The `displayName` parameter is stored as `fileName` for backwards compatibility.
+ * The `options.inputKind` and `options.rawTextPreview` fields are persisted into
+ * the new columns introduced in the single-reference-text-check feature suite.
  */
-export function addJob(jobId: string, jobToken: string, fileName: string): StoredJob {
+export function addJob(
+  jobId: string,
+  jobToken: string,
+  displayName: string,
+  options: AddJobOptions = {}
+): StoredJob {
+  const { inputKind = "file", rawTextPreview } = options;
+
   const newJob: StoredJob = {
     jobId,
     jobToken,
-    fileName,
+    fileName: displayName,
     submittedAt: new Date().toISOString(),
     status: "queued",
     stage: null,
     result: null,
     error: null,
     completedAt: null,
+    inputKind,
+    ...(rawTextPreview !== undefined ? { rawTextPreview } : {}),
   };
 
   const existing = readJobs();
