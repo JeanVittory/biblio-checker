@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import operator
-from typing import Annotated, TypedDict
+from typing import Annotated, NotRequired, TypedDict
 
 
 class GraphState(TypedDict):
@@ -11,15 +11,25 @@ class GraphState(TypedDict):
     ``operator.add`` accumulate results from parallel fan-out invocations —
     LangGraph concatenates updates rather than overwriting. Plain-typed fields
     are written once (or overwritten) by a single node.
+
+    Step 04: ``file_bytes`` and ``source_type`` are now ``NotRequired`` so that
+    text-mode jobs (which enter the graph at ``normalize_references``, bypassing
+    ``extract_text`` and ``parse_references``) do not need to supply these fields
+    in their initial state.  All downstream nodes that use these fields
+    (``extract_text``, ``parse_references``) already run before
+    ``normalize_references`` in file-mode, so they are still populated correctly
+    for file-mode jobs.
     """
 
     # --- Inputs (set once at graph invocation) ---
     job_id: str
     """UUID of the analysis job."""
-    source_type: str
-    """Document type: ``"pdf"`` or ``"docx"``."""
-    file_bytes: bytes
-    """Raw document bytes downloaded from Supabase Storage."""
+    source_type: NotRequired[str]
+    """Document type: ``"pdf"`` or ``"docx"``. Not required for text-mode jobs."""
+    file_bytes: NotRequired[bytes]
+    """Raw document bytes downloaded from Supabase Storage.
+    Not required for text-mode jobs that enter at ``normalize_references``.
+    """
     locale: str
     """User-selected locale for decisionReason/warnings rendering.
     One of ``"es" | "pt" | "en"``. Set at graph invocation; never mutated.

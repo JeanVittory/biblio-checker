@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from anyio.to_thread import run_sync
 from postgrest.exceptions import APIError
 
 from app.core.supabase_client import SupabaseClientError, get_supabase_admin_client
+from app.services._db_failure_classifier import is_service_offline_exception
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -17,6 +18,35 @@ logger = structlog.stdlib.get_logger(__name__)
 class AnalysisJobsRepoError(Exception):
     code: str
     detail: str | None = None
+
+
+@dataclass
+class AnalysisJob:
+    """Represents a row from the analysis_jobs table.
+
+    The four file-specific columns (bucket, path, sha256, source_type) are
+    optional because text-mode jobs leave them NULL.  ``input_kind`` defaults
+    to ``'file'`` so that callers reading existing rows without the column
+    remain backward-compatible.
+    """
+
+    id: str
+    status: str
+    stage: str
+    input_kind: Literal["file", "text"] = "file"
+    raw_reference_text: str | None = None
+    bucket: str | None = None
+    path: str | None = None
+    sha256: str | None = None
+    source_type: str | None = None
+    locale: str | None = None
+    poll_status_token: str | None = None
+    poll_status_token_expires_at: datetime | None = None
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
+    result_json: Any = field(default=None)
+    error_code: str | None = None
+    error_detail: str | None = None
 
 
 async def create_analysis_job(row: dict[str, Any]) -> dict[str, Any]:
@@ -54,6 +84,15 @@ async def create_analysis_job(row: dict[str, Any]) -> dict[str, Any]:
         )
         raise
     except APIError as exc:
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_insert_failed",
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         code = str(exc.code or "").strip()
         is_auth_err = code in ("401", "403")
         err_code = "db_unauthorized" if is_auth_err else "analysis_job_create_failed"
@@ -71,6 +110,15 @@ async def create_analysis_job(row: dict[str, Any]) -> dict[str, Any]:
             code="analysis_job_create_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_insert_failed",
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         logger.error(
             "analysis_job_insert_failed",
             error_code="analysis_job_create_failed",
@@ -137,6 +185,16 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
         )
         raise
     except APIError as exc:
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_fetch_failed",
+                job_id=job_id,
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         code = str(exc.code or "").strip()
         is_auth_err = code in ("401", "403")
         err_code = "db_unauthorized" if is_auth_err else "analysis_job_fetch_failed"
@@ -155,6 +213,16 @@ async def get_analysis_job_by_id(job_id: str) -> dict[str, Any] | None:
             code="analysis_job_fetch_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_fetch_failed",
+                job_id=job_id,
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         logger.error(
             "analysis_job_fetch_failed",
             job_id=job_id,
@@ -223,6 +291,15 @@ async def get_analysis_job_by_share_token(
         )
         raise
     except APIError as exc:
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_fetch_by_share_token_failed",
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         code = str(exc.code or "").strip()
         is_auth_err = code in ("401", "403")
         err_code = "db_unauthorized" if is_auth_err else "analysis_job_fetch_failed"
@@ -240,6 +317,15 @@ async def get_analysis_job_by_share_token(
             code="analysis_job_fetch_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_fetch_by_share_token_failed",
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         logger.error(
             "analysis_job_fetch_by_share_token_failed",
             error_code="analysis_job_fetch_failed",
@@ -303,6 +389,16 @@ async def update_share_token(
         )
         raise
     except APIError as exc:
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_share_token_update_failed",
+                job_id=job_id,
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         code = str(exc.code or "").strip()
         is_auth_err = code in ("401", "403")
         err_code = "db_unauthorized" if is_auth_err else "analysis_job_update_failed"
@@ -321,6 +417,16 @@ async def update_share_token(
             code="analysis_job_update_failed", detail=str(exc) or None
         ) from exc
     except Exception as exc:  # noqa: BLE001
+        if is_service_offline_exception(exc):
+            logger.error(
+                "analysis_job_share_token_update_failed",
+                job_id=job_id,
+                error_code="service_offline",
+                error_detail=str(exc),
+            )
+            raise AnalysisJobsRepoError(
+                code="service_offline", detail=str(exc) or None
+            ) from exc
         logger.error(
             "analysis_job_share_token_update_failed",
             job_id=job_id,

@@ -4,6 +4,10 @@ description: Which spec steps have been implemented and where (langgraph + i18n 
 type: reference
 ---
 
+## single-reference-text-check steps
+
+- **Step 04** — Worker text mode: `AnalysisJob` extended (input_kind, raw_reference_text, nullable file fields), `JobContext.raw_reference_text`, `extract_stage` branched, `run_langgraph_stage` branched, `start_text_analysis_flow` added as separate compiled subgraph, `GraphState.file_bytes`/`source_type` made NotRequired, normalize+adjudicate prompts hardened with `<reference>` delimiters, tests in `tests/test_text_mode.py`.
+
 ## langgraph-reference-analysis steps
 
 All implemented in `apps/worker/biblio_checker_worker/langgraph/`.

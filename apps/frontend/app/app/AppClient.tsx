@@ -9,6 +9,7 @@ import { FileDropzone } from "@/components/file-dropzone";
 import { UploadStatus } from "@/components/upload-status";
 import { BackgroundGrid } from "@/components/background-grid";
 import { RecentAnalyses } from "@/components/recent-analyses";
+import { SingleReferenceForm } from "@/components/single-reference-form";
 import { useTranslations } from "next-intl";
 import { simulateProgress, sourceTypeFromFileName } from "@/lib/file";
 import { ERROR_KEYS, EXTRACT_MODES, MIME_TYPES, STORAGE_PROVIDERS } from "@/lib/constants";
@@ -21,7 +22,9 @@ import { uploadFileService } from "@/services/uploadFile";
 import { cleanupUploadService } from "@/services/cleanupUpload";
 import { startAnalysisGatewayService } from "@/services/startAnalysisGateway";
 import { useRecentAnalysesPolling } from "@/hooks/useRecentAnalysesPolling";
+import { cn } from "@/lib/utils";
 import logger from "@/lib/logger";
+
 const log = logger.child({ module: "home" });
 
 /**
@@ -39,6 +42,8 @@ const initialState: UploadState = {
   fileName: null,
 };
 
+type TabKey = "upload" | "paste";
+
 interface AppClientProps {
   uploadEnabled: boolean;
 }
@@ -49,11 +54,15 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>(initialState);
 
+  // Active tab — "upload" is the default so the existing file flow is the primary CTA.
+  const [activeTab, setActiveTab] = useState<TabKey>("upload");
+
   const { jobs, addTrackedJob, removeTrackedJob } = useRecentAnalysesPolling();
 
   /**
    * True when a QuotaExceededError was thrown by `addTrackedJob`. Cleared on
    * the next successful upload. Passed to <RecentAnalyses> to surface a banner.
+   * Covers BOTH upload and paste mode (§ 9 of Step 07).
    */
   const [storageFullError, setStorageFullError] = useState(false);
 
@@ -105,7 +114,8 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
    * Mount effect — checks for ?sample=1 and, if present:
    *   1. Removes the param from the URL synchronously (before any async work).
    *   2. Fetches and validates the sample document.
-   *   3. Sets file state + auto-submit flag.
+   *   3. Ensures the upload tab is active (§ 8 Step 07).
+   *   4. Sets file state + auto-submit flag.
    *
    * Runs only once per mount thanks to autoTriggeredRef.
    */
@@ -118,6 +128,9 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
     // - Back-navigation restores the clean URL regardless of fetch outcome.
     // - A mid-flight failure does not leave ?sample=1 visible on error.
     window.history.replaceState({}, "", window.location.pathname);
+
+    // Sample is upload-only — switch to the upload tab if the user landed on paste.
+    setActiveTab("upload");
 
     fetchSampleDocument()
       .then((sampleFile) => {
@@ -267,6 +280,23 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
 
       const bibliographyCheck = await bibliographyCheckResponse.json();
 
+      const isServiceOfflinePayload = (raw: unknown): boolean => {
+        if (typeof raw !== "object" || raw === null) return false;
+        const obj = raw as Record<string, unknown>;
+        if (typeof obj.code === "string" && obj.code === "service_offline") {
+          return true;
+        }
+        const backend =
+          typeof obj.backend === "object" && obj.backend !== null
+            ? (obj.backend as Record<string, unknown>)
+            : null;
+        return (
+          backend !== null &&
+          typeof backend.code === "string" &&
+          backend.code === "service_offline"
+        );
+      };
+
       if (
         !bibliographyCheckResponse.ok ||
         !bibliographyCheck ||
@@ -277,7 +307,9 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
         setUploadState({
           status: "error",
           progress: 0,
-          error: t(ERROR_KEYS.ANALYSIS_START_FAILED),
+          error: isServiceOfflinePayload(bibliographyCheck)
+            ? t("errors.service_offline")
+            : t(ERROR_KEYS.ANALYSIS_START_FAILED),
           fileName: file.name,
         });
         return;
@@ -290,10 +322,13 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
       if (!checkSuccess) {
         await attemptCleanup();
         stopProgress();
+        const errorText = isServiceOfflinePayload(bibliographyCheck)
+          ? t("errors.service_offline")
+          : checkMessage || t(ERROR_KEYS.ANALYSIS_START_FAILED);
         setUploadState({
           status: "error",
           progress: 0,
-          error: checkMessage || t(ERROR_KEYS.ANALYSIS_START_FAILED),
+          error: errorText,
           fileName: file.name,
         });
         return;
@@ -330,6 +365,7 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
       } else {
         try {
           setStorageFullError(false);
+          // 3-arg call — backwards-compatible; inputKind defaults to "file".
           addTrackedJob(jobId, jobToken, file.name || "Document");
         } catch (trackingError) {
           if (
@@ -358,6 +394,75 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
     setFile(null);
     setUploadState(initialState);
   }, []);
+
+  /**
+   * onJobCreated wrapper for the paste tab.
+   * Calls addTrackedJob with inputKind="text" and rawTextPreview.
+   *
+   * On QuotaExceededError: sets the shared storageFullError banner (so the same
+   * banner appears in <RecentAnalyses> regardless of which mode triggered it),
+   * then re-throws so that <SingleReferenceForm> can also set its own paste.storage_full
+   * error message (Step 07 § 9 + Step 06 § 5).
+   */
+  const handlePasteJobCreated = useCallback(
+    (
+      jobId: string,
+      jobToken: string,
+      displayName: string,
+      rawTextPreview: string
+    ) => {
+      setStorageFullError(false);
+      try {
+        addTrackedJob(jobId, jobToken, displayName, {
+          inputKind: "text",
+          rawTextPreview,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "QuotaExceededError") {
+          setStorageFullError(true);
+        }
+        // Re-throw so SingleReferenceForm's try/catch can also react.
+        throw err;
+      }
+    },
+    [addTrackedJob]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Tab navigation (keyboard + click)
+  // ---------------------------------------------------------------------------
+
+  const tabListRef = useRef<HTMLDivElement>(null);
+
+  const handleTabKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, current: TabKey) => {
+      const tabs: TabKey[] = ["upload", "paste"];
+      const idx = tabs.indexOf(current);
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const next = tabs[(idx + 1) % tabs.length];
+        setActiveTab(next);
+        const nextBtn = tabListRef.current?.querySelector<HTMLButtonElement>(
+          `[data-tab="${next}"]`
+        );
+        nextBtn?.focus();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = tabs[(idx - 1 + tabs.length) % tabs.length];
+        setActiveTab(prev);
+        const prevBtn = tabListRef.current?.querySelector<HTMLButtonElement>(
+          `[data-tab="${prev}"]`
+        );
+        prevBtn?.focus();
+      }
+    },
+    []
+  );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -396,47 +501,108 @@ export function AppClient({ uploadEnabled }: AppClientProps) {
           <p className="mt-3 text-muted">{t("home.hero_subtitle")}</p>
         </div>
 
-        <div className="w-full space-y-6">
-          <FileDropzone
-            file={file}
-            onFileSelect={handleFileSelect}
-            onError={handleError}
-            disabled={uploadState.status === "uploading"}
-            uploadLocked={!uploadEnabled}
-          />
-
-          {file && uploadState.status !== "uploading" && uploadState.status !== "success" && (
-            <div className="flex gap-3 animate-slide-up">
+        {/* Tabs control — between title block and recent analyses */}
+        <div className="w-full">
+          {/* Tab list */}
+          <div
+            ref={tabListRef}
+            role="tablist"
+            aria-label={t("app.tabs.aria_label")}
+            className="flex gap-0 rounded-t-xl border border-border bg-surface overflow-hidden"
+          >
+            {(["upload", "paste"] as TabKey[]).map((tab) => (
               <button
-                onClick={handleUpload}
-                className="glow-effect flex-1 rounded-lg px-6 py-2.5 text-sm font-medium text-white transition-colors"
-                style={{
-                  background: "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
-                }}
+                key={tab}
+                role="tab"
+                type="button"
+                data-tab={tab}
+                id={`tab-${tab}`}
+                aria-selected={activeTab === tab}
+                aria-controls={`tabpanel-${tab}`}
+                tabIndex={activeTab === tab ? 0 : -1}
+                onClick={() => setActiveTab(tab)}
+                onKeyDown={(e) => handleTabKeyDown(e, tab)}
+                className={cn(
+                  "flex-1 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-accent focus-visible:outline-offset-1",
+                  activeTab === tab
+                    ? "border-b-2 border-accent text-foreground bg-surface"
+                    : "border-b-2 border-transparent text-muted hover:text-foreground hover:bg-surface/60"
+                )}
               >
-                {t("common.submit")}
+                {tab === "upload"
+                  ? t("app.tabs.upload")
+                  : t("app.tabs.paste")}
               </button>
+            ))}
+          </div>
+
+          {/* Tab panels */}
+          <div
+            id="tabpanel-upload"
+            role="tabpanel"
+            aria-labelledby="tab-upload"
+            hidden={activeTab !== "upload"}
+            className={cn(
+              "w-full space-y-6 rounded-b-xl border border-t-0 border-border bg-surface p-4 sm:p-6",
+              activeTab !== "upload" && "hidden"
+            )}
+          >
+            <FileDropzone
+              file={file}
+              onFileSelect={handleFileSelect}
+              onError={handleError}
+              disabled={uploadState.status === "uploading"}
+              uploadLocked={!uploadEnabled}
+            />
+
+            {file && uploadState.status !== "uploading" && uploadState.status !== "success" && (
+              <div className="flex gap-3 animate-slide-up">
+                <button
+                  onClick={handleUpload}
+                  className="glow-effect flex-1 rounded-lg px-6 py-2.5 text-sm font-medium text-white transition-colors"
+                  style={{
+                    background: "linear-gradient(135deg, var(--accent), var(--accent-secondary))",
+                  }}
+                >
+                  {t("common.submit")}
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="rounded-lg border border-border bg-surface px-6 py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
+                >
+                  {t("common.cancel")}
+                </button>
+              </div>
+            )}
+
+            <UploadStatus state={uploadState} />
+
+            {uploadState.status === "success" && (
               <button
                 onClick={handleReset}
-                className="rounded-lg border border-border bg-surface px-6 py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground"
+                className="mx-auto block text-sm text-accent hover:underline transition-colors animate-slide-up"
               >
-                {t("common.cancel")}
+                {t("upload.upload_another")}
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
-          <UploadStatus state={uploadState} />
-
-          {uploadState.status === "success" && (
-            <button
-              onClick={handleReset}
-              className="mx-auto block text-sm text-accent hover:underline transition-colors animate-slide-up"
-            >
-              {t("upload.upload_another")}
-            </button>
-          )}
+          <div
+            id="tabpanel-paste"
+            role="tabpanel"
+            aria-labelledby="tab-paste"
+            hidden={activeTab !== "paste"}
+            className={cn(
+              "w-full rounded-b-xl border border-t-0 border-border bg-surface p-4 sm:p-6",
+              activeTab !== "paste" && "hidden"
+            )}
+          >
+            <SingleReferenceForm
+              onJobCreated={handlePasteJobCreated}
+              disabled={false}
+            />
+          </div>
         </div>
-
       </main>
 
       <section className="mx-auto w-full max-w-4xl px-6 pb-16 sm:px-8">

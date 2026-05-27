@@ -118,8 +118,11 @@ def normalize_references(state: GraphState) -> dict[str, Any]:
 
     logger.info("normalize_starting", reference_count=len(raw_references))
 
+    # Wrap each reference in structural delimiters to prevent prompt injection.
+    # Any instruction-like text inside the tags is treated as data, not commands.
     references_text = "\n\n".join(
-        f"[{ref['index']}] {ref['rawText']}" for ref in raw_references
+        f"[{ref['index']}]\n<reference>\n{ref['rawText']}\n</reference>"
+        for ref in raw_references
     )
 
     llm = get_llm()

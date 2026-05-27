@@ -20,6 +20,7 @@ import {
   removeJob,
   type StoredJob,
   type JobStatus,
+  type AddJobOptions,
 } from "@/lib/localStorage/recentAnalyses";
 import { API_ROUTES, HTTP_STATUS } from "@/lib/constants";
 import { parseResultsV1 } from "@/lib/schemas/resultsV1";
@@ -43,8 +44,19 @@ const ACTIVE_STATUSES: ReadonlySet<JobStatus> = new Set(["queued", "running"]);
 export interface UseRecentAnalysesPollingResult {
   /** Live list of StoredJob, kept in sync with localStorage on each update. */
   jobs: StoredJob[];
-  /** Adds a job to localStorage and immediately starts polling for it. */
-  addTrackedJob: (jobId: string, jobToken: string, fileName: string) => void;
+  /**
+   * Adds a job to localStorage and immediately starts polling for it.
+   *
+   * The fourth `options` argument is optional for backwards compatibility with
+   * existing 3-arg call sites (file-upload flow). When omitted, `inputKind`
+   * defaults to "file" and `rawTextPreview` defaults to undefined.
+   */
+  addTrackedJob: (
+    jobId: string,
+    jobToken: string,
+    displayName: string,
+    options?: AddJobOptions
+  ) => void;
   /** Removes a job from localStorage and cancels its polling interval. */
   removeTrackedJob: (jobId: string) => void;
 }
@@ -225,8 +237,13 @@ export function useRecentAnalysesPolling(): UseRecentAnalysesPollingResult {
   // ---------------------------------------------------------------------------
 
   const addTrackedJob = useCallback(
-    (jobId: string, jobToken: string, fileName: string) => {
-      addJob(jobId, jobToken, fileName);
+    (
+      jobId: string,
+      jobToken: string,
+      displayName: string,
+      options?: AddJobOptions
+    ) => {
+      addJob(jobId, jobToken, displayName, options);
       syncJobsFromStorage();
       startPolling(jobId, jobToken);
     },

@@ -1,9 +1,10 @@
+import re
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.config import settings
 from app.schemas.analysis_jobs import AnalysisJobStatus
@@ -123,6 +124,58 @@ class VerifyAuthenticityRequest(BaseModel):
             raise ValueError("; ".join(errors))
 
         return self
+
+
+# ---------------------------------------------------------------------------
+# Text-mode schemas (single-reference paste flow)
+# ---------------------------------------------------------------------------
+
+# Banned control chars: U+0001–U+001F except \t (0x09), \n (0x0A), \r (0x0D)
+_BANNED_CONTROL_RE = re.compile(r"[\x01-\x08\x0b\x0c\x0e-\x1f]")
+
+
+class TextReferencePayload(BaseModel):
+    rawText: str = Field(..., min_length=1)
+
+    @field_validator("rawText", mode="before")
+    @classmethod
+    def validate_raw_text(cls, v: str) -> str:
+        if not isinstance(v, str):
+            raise ValueError("rawText must be a string")
+        # Strip leading/trailing whitespace first
+        trimmed = v.strip()
+        # Reject all-whitespace (empty after strip)
+        if not trimmed:
+            raise ValueError("rawText must not be empty or all whitespace")
+        # Length check on trimmed value
+        if len(trimmed) < 20:
+            raise ValueError(
+                f"rawText must be at least 20 characters after trimming "
+                f"(got {len(trimmed)})"
+            )
+        if len(trimmed) > 2000:
+            raise ValueError(
+                f"rawText must be at most 2000 characters after trimming "
+                f"(got {len(trimmed)})"
+            )
+        # Null byte check
+        if "\x00" in trimmed:
+            raise ValueError("rawText must not contain null bytes")
+        # Banned ASCII control character check
+        if _BANNED_CONTROL_RE.search(trimmed):
+            raise ValueError(
+                "rawText must not contain ASCII control characters "
+                "(U+0001–U+001F except \\t, \\n, \\r)"
+            )
+        return trimmed
+
+
+class VerifyTextReferenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requestId: UUID
+    reference: TextReferencePayload
+    locale: Locale = Field(default="es")
 
 
 class VerifyAuthenticityResponse(BaseModel):
