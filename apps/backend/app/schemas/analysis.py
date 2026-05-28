@@ -192,6 +192,7 @@ class JobStatusResponse(BaseModel):
     stage: str | None = None
     result: ResultsV1 | None = None
     error: str | None = None
+    errorCode: str | None = None
     submittedAt: datetime
     completedAt: datetime | None = None
 

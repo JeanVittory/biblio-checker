@@ -201,6 +201,7 @@
     "status_fetch_failed": "Não foi possível atualizar o status da tarefa.",
     "network_error": "Erro de rede. Verifique sua conexão e tente novamente.",
     "service_offline": "O serviço não está disponível neste momento. Não é um problema do seu navegador nem do app — nossa equipe já foi notificada. Tente novamente em alguns minutos ou entre em contato com a equipe se o problema persistir.",
+    "trial_limit_reached": "Atingimos o limite de análises disponíveis nesta versão de teste. Não se trata de uma falha do aplicativo. Por favor, entre em contato com a equipe para continuar com seu teste.",
     "invalid_results_format": "O formato dos resultados é inválido ou não suportado.",
     "pdf_generation_failed": "Falha ao gerar o PDF. Por favor, tente novamente."
   },

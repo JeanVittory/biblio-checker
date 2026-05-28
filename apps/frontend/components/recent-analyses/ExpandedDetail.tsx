@@ -351,12 +351,39 @@ export function ExpandedDetail({ job, panelId }: ExpandedDetailProps) {
         </div>
       );
 
-    case "failed":
+    case "failed": {
+      const GENERIC_INFRA_CODES = new Set([
+        "trial_limit_reached",
+        "langgraph_flow_failed",
+        "unexpected_worker_error",
+      ]);
+      // Defense-in-depth: legacy jobs in the DB may carry the hardcoded
+      // technical error_detail without an error_code propagated. Hide those
+      // technical strings from end users regardless.
+      const TECHNICAL_DETAIL_STRINGS = new Set([
+        "LangGraph analysis flow failed.",
+        "An unexpected internal error occurred.",
+        "Analysis trial limit reached.",
+      ]);
+
+      let failedMessage: string;
+      if (job.errorCode === "service_offline") {
+        failedMessage = t("errors.service_offline");
+      } else if (
+        job.errorCode !== null &&
+        job.errorCode !== undefined &&
+        GENERIC_INFRA_CODES.has(job.errorCode)
+      ) {
+        failedMessage = t("errors.trial_limit_reached");
+      } else if (job.error !== null && TECHNICAL_DETAIL_STRINGS.has(job.error)) {
+        failedMessage = t("errors.trial_limit_reached");
+      } else {
+        failedMessage = job.error ?? t("errors.status_fetch_failed");
+      }
+
       return (
         <div id={panelId} role="region" className={cn(panelBase, "space-y-1")}>
-          <p className="text-red-400">
-            {job.error ?? t("errors.status_fetch_failed")}
-          </p>
+          <p className="text-red-400">{failedMessage}</p>
           {job.completedAt !== null && (
             <p className="text-xs text-muted">
               {formatter.relativeTime(new Date(job.completedAt), now)}
@@ -364,6 +391,7 @@ export function ExpandedDetail({ job, panelId }: ExpandedDetailProps) {
           )}
         </div>
       );
+    }
 
     case "expired":
       return (
