@@ -6,6 +6,9 @@ from supabase import Client
 from biblio_checker_worker.jobs import repo
 from biblio_checker_worker.jobs.enums import JobStage
 from biblio_checker_worker.jobs.errors import StageError
+from biblio_checker_worker.jobs.llm_failure_classifier import (
+    is_trial_limit_exception,
+)
 from biblio_checker_worker.langgraph.flow import (
     start_analysis_flow,
     start_text_analysis_flow,
@@ -61,6 +64,17 @@ def run_langgraph_stage(*, supabase: Client, ctx: JobContext) -> None:
                 job=ctx.job, file_bytes=ctx.file_bytes, supabase=supabase
             )
     except Exception as exc:  # noqa: BLE001
+        if is_trial_limit_exception(exc):
+            logger.warning(
+                "langgraph_flow_trial_limit",
+                error_code="trial_limit_reached",
+                error_detail=str(exc)[:200],
+            )
+            raise StageError(
+                code="trial_limit_reached",
+                detail="Analysis trial limit reached.",
+                transient=False,
+            ) from exc
         logger.exception("langgraph_flow_exception")
         raise StageError(
             code="langgraph_flow_failed",

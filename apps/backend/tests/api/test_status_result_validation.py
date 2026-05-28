@@ -259,6 +259,43 @@ async def test_failed_job_returns_null_result():
 
 
 @pytest.mark.anyio
+async def test_failed_job_exposes_error_code():
+    """A failed job must propagate ``error_code`` as ``errorCode`` in the response."""
+    row = _make_row(status="failed", error="Analysis trial limit reached.")
+    row["error_code"] = "trial_limit_reached"
+
+    with patch(
+        "app.api.controllers.analysis.status.get_analysis_job_by_id",
+        new=AsyncMock(return_value=row),
+    ):
+        resp = await _get()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "failed"
+    assert body["errorCode"] == "trial_limit_reached"
+    assert body["error"] == "Analysis trial limit reached."
+
+
+@pytest.mark.anyio
+async def test_succeeded_job_has_null_error_code():
+    """Non-failed states must not expose an errorCode."""
+    row = _make_row(status="succeeded", results=VALID_RESULT_PAYLOAD)
+    row["error_code"] = None
+
+    with patch(
+        "app.api.controllers.analysis.status.get_analysis_job_by_id",
+        new=AsyncMock(return_value=row),
+    ):
+        resp = await _get()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "succeeded"
+    assert body["errorCode"] is None
+
+
+@pytest.mark.anyio
 async def test_queued_job_returns_null_result():
     """A job with status=queued must return result=null in the response."""
     row = _make_row(status="queued")

@@ -178,6 +178,8 @@ export function useRecentAnalysesPolling(): UseRecentAnalysesPollingResult {
           updates.result = parseResultsV1(data.result);
         }
         if (typeof data.error === "string") updates.error = data.error;
+        if (typeof data.errorCode === "string") updates.errorCode = data.errorCode;
+        else if (data.errorCode === null) updates.errorCode = null;
         if (typeof data.completedAt === "string") updates.completedAt = data.completedAt;
 
         updateJob(jobId, updates);

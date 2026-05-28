@@ -111,7 +111,13 @@ async def get_job_status(
                 logger.warning("job_status_result_validation_failed", job_id=jobId)
                 result = None
 
-    error = row.get("error_detail") if status == AnalysisJobStatus.FAILED else None
+    error: str | None = None
+    error_code: str | None = None
+    if status == AnalysisJobStatus.FAILED:
+        error = row.get("error_detail")
+        raw_error_code = row.get("error_code")
+        if isinstance(raw_error_code, str) and raw_error_code:
+            error_code = raw_error_code
 
     return JobStatusResponse(
         jobId=str(row["id"]),
@@ -119,6 +125,7 @@ async def get_job_status(
         stage=row.get("stage"),
         result=result,
         error=error,
+        errorCode=error_code,
         submittedAt=submitted_at,
         completedAt=completed_at,
     )
