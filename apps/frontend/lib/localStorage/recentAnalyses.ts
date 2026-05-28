@@ -30,6 +30,13 @@ export interface StoredJob {
   stage: string | null;
   result: ResultsV1 | null;
   error: string | null;
+  /**
+   * Machine-readable code propagated from the worker via the status endpoint.
+   * Drives client-side mapping to generic i18n messages (e.g. "trial_limit_reached"
+   * → t("errors.trial_limit_reached")). Null/absent for legacy entries and for
+   * non-failed states; optional so older persisted rows remain valid.
+   */
+  errorCode?: string | null;
   /** ISO 8601 or null */
   completedAt: string | null;
   /**
